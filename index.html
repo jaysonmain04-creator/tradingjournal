@@ -6,7 +6,7 @@
     body {
       margin: 0;
       font-family: Arial;
-      background: #401d23;
+      background-color: #401d23 !important;
       color: white;
       text-align: center;
     }
@@ -54,6 +54,19 @@
     button:hover {
       background: #a44b55;
     }
+
+    .trade {
+      background: #2b0f14;
+      margin: 10px auto;
+      padding: 10px;
+      width: 300px;
+      border-radius: 8px;
+    }
+
+    .delete-btn {
+      margin-top: 5px;
+      background: red;
+    }
   </style>
 </head>
 <body>
@@ -61,11 +74,56 @@
 <h1>Trading Journal</h1>
 
 <div class="box">
-  <input placeholder="Pair (NQ)">
-  <input placeholder="Win / Loss">
-  <input placeholder="Notes">
-  <button>Add Trade</button>
+  <input id="pair" placeholder="Pair (NQ)">
+  <input id="result" placeholder="Win / Loss">
+  <input id="notes" placeholder="Notes">
+  <button onclick="addTrade()">Add Trade</button>
 </div>
+
+<h3>Your Trades</h3>
+<div id="trades"></div>
+
+<script>
+let trades = JSON.parse(localStorage.getItem("trades")) || [];
+
+function renderTrades() {
+  const container = document.getElementById("trades");
+  container.innerHTML = "";
+
+  trades.forEach((t, index) => {
+    container.innerHTML += `
+      <div class="trade">
+        <strong>${t.pair}</strong> - ${t.result}<br>
+        ${t.notes}
+        <br>
+        <button class="delete-btn" onclick="deleteTrade(${index})">Delete</button>
+      </div>
+    `;
+  });
+}
+
+function addTrade() {
+  const pair = document.getElementById("pair").value;
+  const result = document.getElementById("result").value;
+  const notes = document.getElementById("notes").value;
+
+  if (!pair || !result) return;
+
+  const trade = { pair, result, notes };
+  trades.push(trade);
+
+  localStorage.setItem("trades", JSON.stringify(trades));
+  renderTrades();
+}
+
+function deleteTrade(index) {
+  trades.splice(index, 1);
+  localStorage.setItem("trades", JSON.stringify(trades));
+  renderTrades();
+}
+
+renderTrades();
+</script>
 
 </body>
 </html>
