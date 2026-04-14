@@ -271,10 +271,7 @@
         background: #2b0f14;
         border-radius: 7px;
         padding: 14px 16px;
-        font-size: 14px;
-        line-height: 1.7;
-        color: #ddd;
-        white-space: pre-wrap;
+        line-height: 1.6;
       }
 
       .detail-img {
@@ -1086,9 +1083,22 @@
         ).join("") + `</div>`
       : "";
 
+    const formatNotes = (raw) => {
+      const labels = ["Aligned with analysis","Rules followed","Mindset","Feeling","Would take again"];
+      return raw.split("\n").map(line => {
+        for (const lbl of labels) {
+          if (line.startsWith(lbl + ": ")) {
+            const val = line.slice(lbl.length + 2);
+            return `<div style="margin-bottom:10px;"><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#aaa;font-weight:bold;">${lbl}</span><br><span style="font-size:14px;color:#ddd;">${val}</span></div>`;
+          }
+        }
+        return `<span style="font-size:14px;color:#ddd;">${line}</span>`;
+      }).join("");
+    };
+
     const notesHTML = t.notes
       ? `<div class="detail-section-title">Notes</div>
-         <div class="detail-notes">${t.notes}</div>`
+         <div class="detail-notes" style="background:#2b0f14;border-radius:7px;padding:14px 16px;">${formatNotes(t.notes)}</div>`
       : "";
 
     const imgHTML = t.image
