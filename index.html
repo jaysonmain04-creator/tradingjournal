@@ -26,17 +26,28 @@
     }
 
     input, select {
-      width: 95%;
+      width: 90%;
       padding: 10px;
-      margin: 5px;
+      margin: 5px 0;
       border-radius: 5px;
       border: none;
       background: #2b0f14;
       color: white;
+      font-size: 14px;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaa'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
     }
 
     button {
-      width: 95%;
+      width: 93%;
       padding: 10px;
       margin-top: 10px;
       border-radius: 5px;
@@ -45,6 +56,7 @@
       color: white;
       cursor: pointer;
       font-weight: bold;
+      font-size: 14px;
     }
 
     button:hover {
@@ -54,14 +66,29 @@
     .trade {
       background: #2b0f14;
       margin: 10px auto;
-      padding: 10px;
+      padding: 12px 16px;
       width: 320px;
       border-radius: 8px;
+      position: relative;
+      box-sizing: border-box;
+      text-align: center;
     }
 
     .delete-btn {
-      background: red;
-      margin-top: 5px;
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: auto;
+      padding: 2px 7px;
+      margin: 0;
+      background: #6b1a22;
+      font-size: 12px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .delete-btn:hover {
+      background: #c0392b;
     }
   </style>
 </head>
@@ -70,8 +97,6 @@
 <h1>Trading Journal</h1>
 
 <div class="box">
-
-  <!-- Pair Dropdown -->
   <select id="pair">
     <option value="">Select Pair</option>
     <option value="NQ">NQ</option>
@@ -79,7 +104,6 @@
     <option value="MNQ">MNQ</option>
   </select>
 
-  <!-- Result Dropdown -->
   <select id="result">
     <option value="">Select Result</option>
     <option value="Win">Win</option>
@@ -87,10 +111,7 @@
     <option value="BE">BE</option>
   </select>
 
-  <!-- RR Input -->
-  <input id="rr" placeholder="RR">
-
-  <!-- Notes -->
+  <input id="rr" placeholder="RR (e.g. 1:2)">
   <input id="notes" placeholder="Notes">
 
   <button onclick="addTrade()">Add Trade</button>
@@ -109,11 +130,10 @@ function renderTrades() {
   trades.forEach((t, index) => {
     container.innerHTML += `
       <div class="trade">
+        <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
         <strong>${t.pair}</strong> - ${t.result}<br>
-        RR: ${t.rr}<br>
+        RR: ${t.rr || "—"}<br>
         ${t.notes}
-        <br>
-        <button class="delete-btn" onclick="deleteTrade(${index})">Delete</button>
       </div>
     `;
   });
@@ -136,7 +156,6 @@ function addTrade() {
   localStorage.setItem("trades", JSON.stringify(trades));
   renderTrades();
 
-  // clear inputs
   document.getElementById("pair").value = "";
   document.getElementById("result").value = "";
   document.getElementById("rr").value = "";
