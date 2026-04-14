@@ -116,14 +116,26 @@
 
     /* ── Trade list ── */
     .trade-list {
-      max-width: 500px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      max-width: 1400px;
       margin: 0 auto;
-      padding: 0 16px 40px;
+      padding: 10px 16px 40px;
     }
+
+    .trade-list > p {
+      grid-column: 1 / -1;
+      text-align: center;
+    }
+
+    @media (max-width: 1100px) { .trade-list { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 760px)  { .trade-list { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px)  { .trade-list { grid-template-columns: 1fr; } }
 
     .trade {
       background: #2b0f14;
-      margin: 8px auto;
+      margin: 0;
       padding: 12px 16px;
       border-radius: 8px;
       position: relative;
