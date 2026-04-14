@@ -4,19 +4,55 @@
   <title>Trading Journal</title>
   <style>
     body {
+      margin: 0;
       font-family: Arial;
-      background: #111;
+      background: #401d23;
       color: white;
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 40px;
+      font-size: 40px;
+    }
+
+    .box {
+      margin: 40px auto;
       padding: 20px;
+      width: 300px;
+      background: #5a2a31;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
-    input, button {
+
+    input {
+      width: 90%;
+      padding: 10px;
       margin: 5px;
-      padding: 8px;
+      border-radius: 5px;
+      border: none;
+      background: #2b0f14;
+      color: white;
     }
-    .trade {
-      border: 1px solid #444;
+
+    input::placeholder {
+      color: #aaa;
+    }
+
+    button {
+      width: 95%;
       padding: 10px;
       margin-top: 10px;
+      border-radius: 5px;
+      border: none;
+      background: #8b3a44;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #a44b55;
     }
   </style>
 </head>
@@ -24,46 +60,12 @@
 
 <h1>Trading Journal</h1>
 
-<h3>Add Trade</h3>
-
-<input id="pair" placeholder="Pair (NQ)">
-<input id="result" placeholder="Win / Loss">
-<input id="notes" placeholder="Notes">
-<button onclick="addTrade()">Add</button>
-
-<h3>Your Trades</h3>
-<div id="trades"></div>
-
-<script>
-let trades = JSON.parse(localStorage.getItem("trades")) || [];
-
-function renderTrades() {
-  const container = document.getElementById("trades");
-  container.innerHTML = "";
-  trades.forEach(t => {
-    container.innerHTML += `
-      <div class="trade">
-        <strong>${t.pair}</strong> - ${t.result}<br>
-        ${t.notes}
-      </div>
-    `;
-  });
-}
-
-function addTrade() {
-  const pair = document.getElementById("pair").value;
-  const result = document.getElementById("result").value;
-  const notes = document.getElementById("notes").value;
-
-  const trade = { pair, result, notes };
-  trades.push(trade);
-
-  localStorage.setItem("trades", JSON.stringify(trades));
-  renderTrades();
-}
-
-renderTrades();
-</script>
+<div class="box">
+  <input placeholder="Pair (NQ)">
+  <input placeholder="Win / Loss">
+  <input placeholder="Notes">
+  <button>Add Trade</button>
+</div>
 
 </body>
 </html>
