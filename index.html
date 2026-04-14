@@ -115,7 +115,8 @@
         border-radius: 8px;
         position: relative;
         box-sizing: border-box;
-        text-align: center;
+        text-align: left;
+        line-height: 1.5;
       }
 
       .trade img {
@@ -172,8 +173,9 @@
       .trade-date {
         font-size: 11px;
         color: #888;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         cursor: pointer;
+        text-align: left;
       }
 
       .trade-date:hover {
@@ -364,8 +366,8 @@
           <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
           <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit date">${t.datetime || "No date"}</div>
           <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span><br>
-          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span><br>
-          ${t.notes}
+          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span>
+          <div style="margin-top:8px;">${t.notes}</div>
           ${imgHTML}
         </div>
       `;
