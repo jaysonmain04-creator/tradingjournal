@@ -297,17 +297,77 @@ if (trades.length === 0) {
   // ── PATTERN ENGINE ──
   const insights = [];
 
-  // Filler words to ignore when scanning notes
-  const STOP = new Set(["i","a","the","and","to","it","in","of","my","was","on","at","had","but","is","so","for","with","not","this","that","then","just","got","got","out","up","be","did","no","too","into","from","after","also","an","as","are","have","its","me","we","they","all","or","if","by"]);
+  // Trading-relevant terms to look for in notes
+  const TRADING_TERMS = new Set([
+    // Psychology / discipline
+    "fomo","revenge","scared","fear","greed","patient","patience","discipline","disciplined",
+    "emotional","hesitated","hesitation","hesitating","confident","confidence","impulsive",
+    "rushed","bored","tired","frustrated","anxious","anxiety","calm","focused","distracted",
+    "overconfident","reckless","random","forced","doubt","doubted","second-guessed",
+    // Entry / exit
+    "entry","exit","entered","exited","target","stop","stoploss","fill","filled","missed",
+    "late","early","chased","chasing","oversize","oversized","size","position","risk",
+    "reward","rr","ratio","drawdown","profit","loss",
+    // Direction / bias
+    "long","short","bullish","bearish","bias","direction","reversal","continuation",
+    // Price action
+    "breakout","breakdown","bounce","rejection","rejected","momentum","pullback","retest",
+    "retested","consolidation","ranging","range","trend","trending","support","resistance",
+    "level","zone","structure","candle","wick","body","setup","signal","confluence",
+    "pattern","highs","lows","high","low",
+    // Market conditions
+    "news","choppy","chop","volatile","volatility","liquidity","spread","session","volume",
+    "gap","slow","fast","trap","trapped","fake","fakeout",
+    // Order flow / SMC terms
+    "imbalance","rebalance","mitigation","mitigated","orderblock","liquidity","sweep",
+    "inducement","displacement","bos","choch","mss","fvg","poi","premium","discount",
+    // Actions
+    "held","ran","stopped","triggered","reversed","continued","tapped","broke","broken",
+    "pushed","dumped","squeezed","spiked","wicked"
+  ]);
+
+  // Generic English words to always ignore (even if repeated)
+  const STOP = new Set([
+    "the","and","to","it","in","of","my","was","on","at","had","but","is","so","for",
+    "with","not","this","that","then","just","got","out","up","be","did","no","too",
+    "into","from","after","also","an","as","are","have","its","me","we","they","all",
+    "or","if","by","i","a","you","he","she","we","our","your","his","her","their",
+    "want","wanted","like","liked","how","far","kept","keep","came","come","went","go",
+    "take","took","make","made","said","say","know","knew","think","thought","see","saw",
+    "felt","feel","would","could","should","will","can","may","might","must","need",
+    "been","being","get","very","really","quite","still","again","even","already","almost",
+    "always","never","often","sometimes","finally","actually","basically","however",
+    "therefore","pretty","about","around","before","during","through","between","over",
+    "under","back","right","left","other","more","less","much","many","few","some","any",
+    "every","each","both","time","day","week","month","year","thing","way","part","here",
+    "there","where","when","why","what","which","who","same","different","new","old",
+    "big","good","bad","well","now","then","set","end","put","try","tried","used","use",
+    "move","moved","look","looked","let","its","these","those","than","only","such",
+    "own","while","where","because","since","unless","until","although","whether",
+    "nor","yet","either","neither","once","further","down","off","next","last","first",
+    "second","third","price","prices","higher","lower","little","didnt","wasnt","couldnt",
+    "shouldnt","wouldnt","expanded","instead","thought","thinking","going","doing",
+    "something","anything","nothing","everything","another","without","within","across"
+  ]);
 
   function tokenize(text) {
-    return text.toLowerCase().replace(/[^a-z\s]/g," ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+    return text.toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !STOP.has(w));
   }
 
   function wordFreq(tradeSet) {
     const freq = {};
     tradeSet.forEach(t => tokenize(t.notes || "").forEach(w => { freq[w] = (freq[w]||0)+1; }));
     return freq;
+  }
+
+  // Only surface a word if it's a known trading term OR appears 4+ times
+  function filterRelevant(freq) {
+    return Object.fromEntries(
+      Object.entries(freq).filter(([w, c]) => TRADING_TERMS.has(w) || c >= 4)
+    );
   }
 
   // 1. Pair loss rate
@@ -356,8 +416,8 @@ if (trades.length === 0) {
   if (revengeCnt >= 2) insights.push({ level:"warning", text: `Possible <strong>revenge trading</strong> detected — you've taken back-to-back losses on the same pair <strong>${revengeCnt} times</strong>. After a loss, pause before re-entering.` });
 
   // 6. Word frequency on loss notes vs win notes
-  const lossFreq = wordFreq(losses);
-  const winFreq  = wordFreq(wins);
+  const lossFreq = filterRelevant(wordFreq(losses));
+  const winFreq  = filterRelevant(wordFreq(wins));
 
   // Words that appear WAY more in losses than wins (signal words)
   const lossSignal = Object.entries(lossFreq)
