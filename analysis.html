@@ -273,6 +273,56 @@
       font-size: 28px; cursor: pointer; color: white;
       font-weight: bold; background: none; border: none;
     }
+
+    /* ── AI Chat Widget ── */
+    #chat-fab {
+      position: fixed; top: 12px; right: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #8b3a44; border: 2px solid #a84452;
+      color: white; font-size: 18px; cursor: pointer;
+      z-index: 1001; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    }
+    #chat-fab:hover { background: #a84452; }
+    #chat-panel {
+      display: none; position: fixed; top: 60px; right: 16px;
+      width: 320px; height: 460px; background: #1a0a0c;
+      border: 1px solid #5a2a31; border-radius: 12px;
+      z-index: 1000; flex-direction: column;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.7); overflow: hidden;
+    }
+    #chat-panel.open { display: flex; }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 4px 0; }
+    #chat-input-row {
+      padding: 8px; border-top: 1px solid #2b1015;
+      display: flex; gap: 6px; flex-shrink: 0;
+    }
+    #chat-input {
+      flex: 1; min-width: 0; width: auto;
+      padding: 8px 10px; margin: 0; border-radius: 6px;
+      font-size: 13px; background: #2b1015;
+      border: 1px solid #5a2a31; color: white; outline: none;
+    }
+    #chat-send {
+      padding: 8px 12px; background: #8b3a44; border: none;
+      border-radius: 6px; color: white; cursor: pointer;
+      font-size: 13px; flex-shrink: 0;
+    }
+    #chat-send:hover { background: #a84452; }
+    #chat-key-btn, #chat-close-btn {
+      background: none; border: none; padding: 3px 7px;
+      cursor: pointer; color: #888; font-size: 14px;
+    }
+    #chat-key-btn:hover, #chat-close-btn:hover {
+      color: #ccc; background: rgba(255,255,255,0.06); border-radius: 4px;
+    }
+    #chat-save-btn {
+      width: 100%; padding: 9px; margin-top: 8px;
+      background: #8b3a44; border: none; border-radius: 5px;
+      color: white; cursor: pointer; font-size: 13px;
+    }
+    #chat-save-btn:hover { background: #a84452; }
   </style>
 </head>
 <body>
@@ -367,9 +417,13 @@ if (trades.length === 0) {
     // Market conditions
     "news","choppy","chop","volatile","volatility","liquidity","spread","session","volume",
     "gap","slow","fast","trap","trapped","fake","fakeout",
+    // iFVG / DodgysDD strategy terms
+    "ifvg","bsl","ssl","dol","reversal","continuation","equilibrium","inversion","inverted",
+    "eqh","eql","reqh","reql","ith","itl","lrlr","htf","ltf","bpr","displacement",
+    "buyside","sellside","drawon","internal","external","sweep","swept","delivery",
     // Order flow / SMC terms
-    "imbalance","rebalance","mitigation","mitigated","orderblock","liquidity","sweep",
-    "inducement","displacement","bos","choch","mss","fvg","poi","premium","discount",
+    "imbalance","rebalance","mitigation","mitigated","orderblock","liquidity",
+    "inducement","bos","choch","mss","fvg","poi","premium","discount",
     // Actions
     "held","ran","stopped","triggered","reversed","continued","tapped","broke","broken",
     "pushed","dumped","squeezed","spiked","wicked"
@@ -529,6 +583,65 @@ if (trades.length === 0) {
     }
   }
 
+  // 11. Setup grade analysis
+  const gradedTrades = trades.filter(t => t.grade);
+  if (gradedTrades.length >= 3) {
+    // Win rate per grade tier
+    const aPlusTrades = gradedTrades.filter(t => t.grade === "A+" || t.grade === "A");
+    const aMinus      = gradedTrades.filter(t => t.grade === "A-" || t.grade === "B+");
+    const bOrLower    = gradedTrades.filter(t => ["B","B-","C"].includes(t.grade));
+
+    if (aPlusTrades.length >= 2) {
+      const wr = ((aPlusTrades.filter(t=>t.result==="Win").length / aPlusTrades.length)*100).toFixed(0);
+      insights.push({ level:"good", text: `Your <strong>A/A+ setups</strong> win <strong>${wr}%</strong> of the time (${aPlusTrades.length} trades). These are your bread-and-butter — only trade these when you can.` });
+    }
+    if (bOrLower.length >= 2) {
+      const wr = ((bOrLower.filter(t=>t.result==="Win").length / bOrLower.length)*100).toFixed(0);
+      const losses = bOrLower.filter(t=>t.result==="Loss").length;
+      if (losses >= 1) insights.push({ level:"warning", text: `You've taken <strong>${bOrLower.length} B/C grade setups</strong> and only won <strong>${wr}%</strong>. These are low-quality entries — cut them entirely or size way down.` });
+    }
+
+    // Most common losing grade
+    const gradeLosses = {};
+    losses.filter(t=>t.grade).forEach(t => { gradeLosses[t.grade] = (gradeLosses[t.grade]||0)+1; });
+    const worstGrade = Object.entries(gradeLosses).sort((a,b)=>b[1]-a[1])[0];
+    if (worstGrade && worstGrade[1] >= 2) {
+      insights.push({ level:"warning", text: `Your most common losing setup grade is <strong>${worstGrade[0]}</strong> (${worstGrade[1]} losses). You keep entering at this quality level and losing — raise your minimum.` });
+    }
+  }
+
+  // 12. Reversal vs Continuation model win rate
+  const reversals     = trades.filter(t => t.tradeType === "Reversal");
+  const continuations = trades.filter(t => t.tradeType === "Continuation");
+  if (reversals.length >= 3 && continuations.length >= 3) {
+    const revWR  = ((reversals.filter(t=>t.result==="Win").length/reversals.length)*100).toFixed(0);
+    const contWR = ((continuations.filter(t=>t.result==="Win").length/continuations.length)*100).toFixed(0);
+    const diff   = Math.abs(parseInt(revWR) - parseInt(contWR));
+    if (diff >= 15) {
+      const better   = parseInt(revWR) > parseInt(contWR) ? "Reversal" : "Continuation";
+      const betterWR = Math.max(parseInt(revWR), parseInt(contWR));
+      const worse    = better === "Reversal" ? "Continuation" : "Reversal";
+      const worseWR  = Math.min(parseInt(revWR), parseInt(contWR));
+      insights.push({ level:"info", text: `<strong>${better} model</strong> wins <strong>${betterWR}%</strong> vs ${worse} at <strong>${worseWR}%</strong>. You execute better in one model — figure out why and lean into it.` });
+    } else {
+      insights.push({ level:"info", text: `Reversal: <strong>${revWR}%</strong> win rate (${reversals.length} trades) | Continuation: <strong>${contWR}%</strong> (${continuations.length} trades).` });
+    }
+  } else if (reversals.length + continuations.length >= 2) {
+    insights.push({ level:"info", text: `Tag all trades as Reversal or Continuation — once you have enough, patterns between models will surface here.` });
+  }
+
+  // 13. No-sweep losses (rule #1 violation)
+  const noSweepLosses = losses.filter(t => t.checklist && !t.checklist.sweep);
+  if (noSweepLosses.length >= 2) {
+    insights.push({ level:"warning", text: `<strong>${noSweepLosses.length} losses</strong> were taken <strong>without a BSL/SSL sweep</strong>. Rule #1 is non-negotiable — no sweep, no trade. These are your most avoidable losses.` });
+  }
+
+  // 14. Invalid entry losses (sweep present but valid entry not checked)
+  const invalidEntryLosses = losses.filter(t => t.checklist && t.checklist.sweep && t.checklist.ifvg && !t.checklist.valid);
+  if (invalidEntryLosses.length >= 2) {
+    insights.push({ level:"warning", text: `<strong>${invalidEntryLosses.length} losses</strong> where you had the sweep and IFVG but <strong>entry was invalid</strong> (internal high/low already taken). Wait for inversion before the next internal level.` });
+  }
+
   // ── HTML ──
   function pct(n) { return total > 0 ? Math.round((n/total)*100) : 0; }
 
@@ -550,23 +663,63 @@ if (trades.length === 0) {
       </div>
     </div>`).join("");
 
-  const resultColor = { Win: "win-text", Loss: "loss-text", BE: "be-text" };
-  const borderClass  = { Win: "win-trade", Loss: "loss-trade", BE: "be-trade" };
+  // ── Pre-compute grade & model bars ──
+  const GRADE_COLORS = { "A+":"#4caf50","A":"#66bb6a","A-":"#8bc34a","B+":"#ffa726","B":"#ff7043","B-":"#e53935","C":"#b71c1c" };
+  const gradeOrder = ["A+","A","A-","B+","B","B-","C"];
 
-  const tradeCards = [...trades].reverse().map((t, ri) => {
-    const i = trades.length - 1 - ri;
-    const imgHTML = t.image
-      ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${t.image.replace(/'/g,"\\'")}'">`
-      : "";
-    return `
-      <div class="trade ${borderClass[t.result] || ''}">
-        <div class="trade-date">${t.datetime || ""}</div>
-        <strong>${t.pair}</strong> - <span class="${resultColor[t.result] || ''}">${t.result}</span><br>
-        RR: ${t.rr || "—"}<br>
-        ${t.notes || ""}
-        ${imgHTML}
-      </div>`;
-  }).join("");
+  // gradedTrades already declared above (insight #11)
+  const gradeBars = gradedTrades.length >= 2 ? gradeOrder.map(g => {
+    const gt = gradedTrades.filter(t => t.grade === g);
+    if (gt.length === 0) return "";
+    const gWins = gt.filter(t => t.result === "Win").length;
+    const gLoss = gt.filter(t => t.result === "Loss").length;
+    const gWR   = ((gWins / gt.length) * 100).toFixed(0);
+    const col   = GRADE_COLORS[g] || "#888";
+    return `<div class="bar-group">
+      <div class="bar-label"><span style="color:${col};font-weight:bold;">${g}</span><span>${gt.length} trade${gt.length>1?"s":""} &nbsp;·&nbsp; W:${gWins} L:${gLoss} &nbsp;·&nbsp; <strong>${gWR}% WR</strong></span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${gWR}%;background:${col};"></div></div>
+    </div>`;
+  }).join("") : "";
+
+  const modelBars = (reversals.length + continuations.length >= 2) ? [
+    { label:"Reversal",     set: reversals,     color:"#42a5f5" },
+    { label:"Continuation", set: continuations, color:"#ab47bc" }
+  ].filter(x => x.set.length > 0).map(({ label, set, color }) => {
+    const w  = set.filter(t => t.result === "Win").length;
+    const wr = ((w / set.length) * 100).toFixed(0);
+    return `<div class="bar-group">
+      <div class="bar-label"><span style="font-weight:bold;">${label}</span><span>${set.length} trades &nbsp;·&nbsp; ${w} wins &nbsp;·&nbsp; <strong>${wr}% WR</strong></span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${wr}%;background:${color};"></div></div>
+    </div>`;
+  }).join("") : "";
+
+  // A/A+ rate stat
+  const aPlusCount  = gradedTrades.filter(t => t.grade === "A+" || t.grade === "A").length;
+  const aPlusRate   = gradedTrades.length ? Math.round((aPlusCount / gradedTrades.length) * 100) : null;
+
+  // Quality Score: checklist (0-6 pts) + confidence (0-4 pts) = 0-10
+  function qualityScore(t) {
+    let score = 0, hasSomething = false;
+    if (t.checklist) {
+      const keys = ["sweep","ifvg","valid","target","pd","momentum"];
+      score += (keys.filter(k => t.checklist[k]).length / 6) * 6;
+      hasSomething = true;
+    }
+    if (t.confidence) { score += (t.confidence / 10) * 4; hasSomething = true; }
+    return hasSomething ? Math.round(score) : null;
+  }
+  function qsColor(qs) { return qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935"; }
+
+  const scoredTrades = trades.map(t => ({ ...t, qs: qualityScore(t) })).filter(t => t.qs !== null);
+  const avgQS = scoredTrades.length
+    ? (scoredTrades.reduce((a, t) => a + t.qs, 0) / scoredTrades.length).toFixed(1)
+    : null;
+  const avgQSWin  = scoredTrades.filter(t => t.result === "Win").length
+    ? (scoredTrades.filter(t => t.result === "Win").reduce((a,t)=>a+t.qs,0) / scoredTrades.filter(t=>t.result==="Win").length).toFixed(1)
+    : null;
+  const avgQSLoss = scoredTrades.filter(t => t.result === "Loss").length
+    ? (scoredTrades.filter(t => t.result === "Loss").reduce((a,t)=>a+t.qs,0) / scoredTrades.filter(t=>t.result==="Loss").length).toFixed(1)
+    : null;
 
   content.innerHTML = `
     <!-- Stats -->
@@ -591,6 +744,14 @@ if (trades.length === 0) {
         <div class="stat-label">BE</div>
         <div class="stat-value" style="color:#42a5f5;">${bes.length}</div>
       </div>
+      ${aPlusRate !== null ? `<div class="stat-card">
+        <div class="stat-label">A/A+ Rate</div>
+        <div class="stat-value" style="color:#4caf50;">${aPlusRate}%</div>
+      </div>` : ""}
+      ${avgQS !== null ? `<div class="stat-card">
+        <div class="stat-label">Avg Quality</div>
+        <div class="stat-value" style="color:${qsColor(parseFloat(avgQS))};">${avgQS}<span style="font-size:13px;color:#888;">/10</span></div>
+      </div>` : ""}
     </div>
 
     <!-- Overview bars -->
@@ -606,6 +767,26 @@ if (trades.length === 0) {
       <div class="section-title" style="margin-top:8px;">By Pair &nbsp;<span style="font-size:11px;color:#4caf50;">■</span> Win &nbsp;<span style="font-size:11px;color:#e53935;">■</span> Loss &nbsp;<span style="font-size:11px;color:#42a5f5;">■</span> BE</div>
       ${pairBars}
     </div>
+
+    <!-- By setup grade -->
+    ${gradeBars ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;">By Setup Grade</div>
+      ${gradeBars}
+    </div>` : ""}
+
+    <!-- By trade model -->
+    ${modelBars ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;">By Trade Model</div>
+      ${modelBars}
+    </div>` : ""}
+
+    <!-- Quality score breakdown -->
+    ${(avgQSWin !== null || avgQSLoss !== null) ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;">Quality Score Breakdown <span style="font-size:11px;color:#888;">(checklist 0–6 pts + confidence 0–4 pts)</span></div>
+      ${avgQSWin  !== null ? `<div class="bar-group"><div class="bar-label"><span style="color:#4caf50;">Wins &nbsp;— avg QS</span><span style="color:#4caf50;font-weight:bold;">${avgQSWin}/10</span></div><div class="bar-track"><div class="bar-fill win" style="width:${parseFloat(avgQSWin)*10}%;"></div></div></div>` : ""}
+      ${avgQSLoss !== null ? `<div class="bar-group"><div class="bar-label"><span style="color:#e53935;">Losses — avg QS</span><span style="color:#e53935;font-weight:bold;">${avgQSLoss}/10</span></div><div class="bar-track"><div class="bar-fill loss" style="width:${parseFloat(avgQSLoss)*10}%;"></div></div></div>` : ""}
+      ${avgQS     !== null ? `<div style="font-size:12px;color:#888;margin-top:6px;">Overall avg: <strong style="color:${qsColor(parseFloat(avgQS))};">${avgQS}/10</strong> across ${scoredTrades.length} rated trades</div>` : ""}
+    </div>` : ""}
 
     <!-- Patterns -->
     ${insights.length ? `
@@ -704,6 +885,18 @@ if (trades.length === 0) {
           const midConfLoss = losses.filter(t => t.confidence && t.confidence >= 5 && t.confidence <= 6);
           if (midConfLoss.length >= 2) lossInsights.push(`<strong>${midConfLoss.length}</strong> loss${midConfLoss.length>1?"es":""} at <strong>confidence 5–6/10</strong>. Mediocre conviction = mediocre results. Raise your minimum confidence threshold.`);
 
+          // Low grade losses (B, B-, C)
+          const lowGradeLoss = losses.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
+          if (lowGradeLoss.length >= 1) lossInsights.push(`<strong>${lowGradeLoss.length}</strong> loss${lowGradeLoss.length>1?"es":""} on <strong>B/C grade setups</strong>. Missing sweep, IFVG, or valid entry — below your minimum standard.`);
+
+          // No BSL/SSL sweep (rule #1 violation)
+          const noSweepL = losses.filter(t => t.checklist && !t.checklist.sweep);
+          if (noSweepL.length >= 1) lossInsights.push(`<strong>${noSweepL.length}</strong> loss${noSweepL.length>1?"es":""} taken <strong>without a liquidity sweep</strong>. Rule #1: BSL or SSL must be taken before entry. These were completely avoidable.`);
+
+          // Invalid entry (took when internal high/low already hit)
+          const invalidL = losses.filter(t => t.checklist && t.checklist.sweep && !t.checklist.valid);
+          if (invalidL.length >= 1) lossInsights.push(`<strong>${invalidL.length}</strong> loss${invalidL.length>1?"es":""} on <strong>invalid entries</strong> — inversion co-occurred with or after the internal high/low. Wait for inversion to happen first.`);
+
           if (lossInsights.length === 0) lossInsights.push("Not enough note detail yet to detect specific loss patterns. Keep journaling.");
 
           return lossInsights.map(t => `<div class="insight" style="border-left-color:#e53935;">⚠️ ${t}</div>`).join("");
@@ -740,6 +933,16 @@ if (trades.length === 0) {
             winInsights.push(`Average confidence on your wins: <strong>${avgCW}/10</strong>. Trades above this mark tend to pay — below it, think twice.`);
           }
 
+          // High grade wins (A, A+)
+          const highGradeWins = wins.filter(t => t.grade && (t.grade === "A+" || t.grade === "A"));
+          if (highGradeWins.length >= 1) winInsights.push(`<strong>${highGradeWins.length}</strong> win${highGradeWins.length>1?"s":""} on <strong>A/A+ grade setups</strong> — full checklist met. This is the blueprint.`);
+
+          // Most common winning grade
+          const gradeWinCount = {};
+          wins.filter(t=>t.grade).forEach(t => { gradeWinCount[t.grade] = (gradeWinCount[t.grade]||0)+1; });
+          const bestGrade = Object.entries(gradeWinCount).sort((a,b)=>b[1]-a[1])[0];
+          if (bestGrade && bestGrade[1] >= 2) winInsights.push(`Your most common winning grade is <strong>${bestGrade[0]}</strong> (${bestGrade[1]} wins). Focus your entries here.`);
+
           if (winInsights.length === 0) winInsights.push("Keep adding detailed notes to your wins — patterns will surface here as you journal more.");
 
           return winInsights.map(t => `<div class="insight" style="border-left-color:#4caf50;">✅ ${t}</div>`).join("");
@@ -760,6 +963,27 @@ if (trades.length === 0) {
     <div class="trade-list" id="journal-list"></div>
   `;
 
+  // ── Grade helpers (mirrored from journal) ──
+  function calcGrade(c) {
+    const { sweep, ifvg, valid, target, pd, momentum } = c;
+    if (sweep && ifvg && momentum && valid && target && pd) return "A+";
+    if (sweep && ifvg && valid && target && pd)             return "A";
+    if (sweep && ifvg && valid && target)                   return "A-";
+    if (sweep && ifvg && target)                            return "B+";
+    if (sweep && target)                                    return "B";
+    if (sweep)                                              return "B-";
+    return "C";
+  }
+  function gradeColor(g) {
+    if (g === "A+") return "#4caf50";
+    if (g === "A")  return "#66bb6a";
+    if (g === "A-") return "#8bc34a";
+    if (g === "B+") return "#ffa726";
+    if (g === "B")  return "#ff7043";
+    if (g === "B-") return "#e53935";
+    return "#b71c1c";
+  }
+
   // ── Journal card renderer ──
   function buildJournalCards(filter) {
     const list = document.getElementById("journal-list");
@@ -771,6 +995,8 @@ if (trades.length === 0) {
     }
     const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
     const borderClass  = { Win: "win-trade", Loss: "loss-trade", BE: "be-trade" };
+    const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+    const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
     list.innerHTML = [...filtered].reverse().map(t => {
       const color = resultColor[t.result] || "white";
       const cls   = borderClass[t.result] || "";
@@ -778,11 +1004,28 @@ if (trades.length === 0) {
       const conf = t.confidence;
       const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
       const confLabel = conf ? `${conf}/10` : "—/10";
+      const qs = qualityScore(t);
+      const qsHTML = qs !== null
+        ? ` &nbsp;|&nbsp; QS: <span style="color:${qsColor(qs)};font-weight:bold;">${qs}/10</span>`
+        : "";
+      const gradeHTML = t.grade
+        ? `<span style="color:${gradeColor(t.grade)};font-weight:bold;font-size:12px;background:#1a0a0c;padding:1px 7px;border-radius:4px;margin-left:6px;">${t.grade}</span>`
+        : "";
+      const typeHTML = t.tradeType
+        ? `<span style="font-size:10px;color:#888;margin-left:6px;">${t.tradeType}</span>`
+        : "";
+      const checklistHTML = t.checklist
+        ? `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px;">` +
+          clKeys.map((k,i) =>
+            `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${t.checklist[k]?"#1b4d1e":"#2b1015"};color:${t.checklist[k]?"#81c784":"#555"};">${t.checklist[k]?"✓":"✗"} ${clLabels[i]}</span>`
+          ).join("") + `</div>`
+        : "";
       return `
         <div class="trade ${cls}">
           <div class="trade-date">${t.datetime || "No date"}</div>
-          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span><br>
-          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;">${confLabel}</span>
+          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
+          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;">${confLabel}</span>${qsHTML}
+          ${checklistHTML}
           <div style="margin-top:8px;">${t.notes || ""}</div>
           ${imgHTML}
         </div>`;
@@ -797,6 +1040,142 @@ if (trades.length === 0) {
     buildJournalCards(type);
   };
 }
+</script>
+
+<!-- ── AI Chat Widget ── -->
+<button id="chat-fab" onclick="toggleChat()" title="AI Trading Assistant">💬</button>
+<div id="chat-panel">
+  <div style="padding:10px 14px;background:#3a1018;border-bottom:1px solid #5a2a31;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div style="font-size:13px;font-weight:bold;">🤖 AI Assistant</div>
+    <div style="display:flex;gap:2px;align-items:center;">
+      <button id="chat-key-btn" onclick="clearChatKey()" title="Change API key">🔑</button>
+      <button id="chat-close-btn" onclick="toggleChat()">✕</button>
+    </div>
+  </div>
+  <div id="chat-messages"></div>
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" placeholder="Ask about your trades...">
+    <button id="chat-send" onclick="sendChatMsg()">Send</button>
+  </div>
+</div>
+
+<script>
+let _chatOpen = false, _chatHistory = [], _chatMsgId = 0;
+
+function toggleChat() {
+  _chatOpen = !_chatOpen;
+  document.getElementById("chat-panel").classList.toggle("open", _chatOpen);
+  if (_chatOpen) {
+    if (!localStorage.getItem("ai_api_key")) showChatKeyPrompt();
+    else if (_chatHistory.length === 0) initChat();
+    setTimeout(() => document.getElementById("chat-input")?.focus(), 60);
+  }
+}
+
+function clearChatKey() {
+  localStorage.removeItem("ai_api_key");
+  _chatHistory = [];
+  showChatKeyPrompt();
+}
+
+function showChatKeyPrompt() {
+  document.getElementById("chat-messages").innerHTML = `
+    <div style="padding:16px;font-size:13px;color:#ccc;line-height:1.6;">
+      <div style="margin-bottom:12px;">Enter your <strong>OpenAI API key</strong> to start chatting.<br>Saved only in your browser.</div>
+      <input id="api-key-input" type="password" placeholder="sk-..." style="width:100%;padding:8px 10px;border-radius:5px;background:#2b0f14;border:1px solid #8b3a44;color:white;font-size:13px;box-sizing:border-box;outline:none;">
+      <button id="chat-save-btn" onclick="saveChatKey()">Save &amp; Start Chat</button>
+      <div style="margin-top:10px;font-size:11px;color:#666;">platform.openai.com/api-keys · Uses gpt-4o-mini</div>
+    </div>`;
+}
+
+function saveChatKey() {
+  const val = (document.getElementById("api-key-input")?.value || "").trim();
+  if (!val.startsWith("sk-")) { alert("Enter a valid OpenAI key (starts with sk-)"); return; }
+  localStorage.setItem("ai_api_key", val);
+  initChat();
+}
+
+let _chatSystem = "";
+
+function initChat() {
+  const t = JSON.parse(localStorage.getItem("trades") || "[]");
+  const wins = t.filter(x=>x.result==="Win").length;
+  const losses = t.filter(x=>x.result==="Loss").length;
+  const wr = t.length ? Math.round(wins/t.length*100) : 0;
+  const pairs = [...new Set(t.slice(-15).map(x=>x.pair).filter(Boolean))].join(", ") || "none";
+  _chatSystem = `You are an AI trading assistant embedded in a personal trading journal.
+
+STRATEGY (iFVG — DodgysDD):
+• Rule #1: BSL or SSL must be swept — no sweep = no trade (C grade, avoidable loss)
+• Reversal: sweep BSL/SSL → IFVG inversion → target DOL (EQH/EQL/ITH/ITL/LRLR)
+• Continuation: retrace 50% EQ → new IFVG inversion → next target
+• Valid entry: inversion closes BEFORE next internal high/low is taken
+• Checklist: BSL/SSL Swept | IFVG Identified | Valid Entry | Clear DOL | Correct P/D | No Chop
+• Grades: A+=all 6 | A=no chop missing | A-=P/D missing | B+=valid missing | B=sweep+target | B-=sweep only | C=no sweep
+
+STATS: ${t.length} trades | ${wr}% WR | ${wins}W ${losses}L | pairs: ${pairs}
+
+Be concise and practical. No financial advice.`;
+  _chatHistory = [];
+  document.getElementById("chat-messages").innerHTML =
+    `<div style="padding:12px;font-size:12px;color:#888;line-height:1.5;">Ask me about your setups, patterns, or the iFVG strategy.</div>`;
+}
+
+async function sendChatMsg() {
+  const key = localStorage.getItem("ai_api_key");
+  if (!key) { showChatKeyPrompt(); return; }
+  if (!_chatSystem) initChat();
+  const input = document.getElementById("chat-input");
+  const text = (input.value || "").trim();
+  if (!text) return;
+  input.value = "";
+  _appendChatMsg("user", text);
+  _chatHistory.push({ role: "user", content: text });
+  const tid = _appendChatMsg("assistant", null, true);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 600,
+        messages: [{ role: "system", content: _chatSystem }, ..._chatHistory]
+      })
+    });
+    document.getElementById(tid)?.remove();
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      _appendChatMsg("assistant", `Error: ${e.error?.message || "API error — check your key."}`);
+      return;
+    }
+    const data = await res.json();
+    const reply = data.choices[0].message.content;
+    _chatHistory.push({ role: "assistant", content: reply });
+    _appendChatMsg("assistant", reply);
+  } catch {
+    document.getElementById(tid)?.remove();
+    _appendChatMsg("assistant", "Connection error — check internet or API key.");
+  }
+}
+
+function _appendChatMsg(role, text, typing=false) {
+  const msgs = document.getElementById("chat-messages");
+  const id = "cm-"+(++_chatMsgId);
+  const isUser = role === "user";
+  const d = document.createElement("div");
+  d.id = id;
+  d.style.cssText = `padding:8px 11px;margin:4px 8px;border-radius:8px;font-size:13px;line-height:1.5;max-width:86%;word-break:break-word;${isUser?"background:#5a2a31;margin-left:auto;":"background:#2b1015;"}`;
+  d.innerHTML = typing
+    ? `<span style="color:#555;">thinking...</span>`
+    : (text||"").replace(/</g,"&lt;").replace(/\n/g,"<br>").replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>");
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key==="Enter" && _chatOpen && document.activeElement?.id==="chat-input") sendChatMsg();
+});
 </script>
 
 </body>
