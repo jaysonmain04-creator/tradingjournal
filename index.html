@@ -172,6 +172,18 @@
     .trade.loss-trade { border-left: 3px solid #e53935; }
     .trade.be-trade   { border-left: 3px solid #42a5f5; }
 
+    .trade-date {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .trade-date:hover {
+      color: #bbb;
+      text-decoration: underline;
+    }
+
     /* Lightbox */
     #lightbox {
       display: none;
@@ -349,6 +361,7 @@ function renderTrades() {
     container.innerHTML += `
       <div class="trade ${colorClass}">
         <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
+        <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit">${t.datetime || "No date"}</div>
         <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span><br>
         RR: ${t.rr || "—"}<br>
         ${t.notes}
@@ -369,7 +382,9 @@ function addTrade() {
     return;
   }
 
-  const trade = { pair, result, rr, notes, image: pendingImage };
+  const now = new Date();
+  const datetime = now.toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true });
+  const trade = { pair, result, rr, notes, image: pendingImage, datetime };
   trades.push(trade);
 
   localStorage.setItem("trades", JSON.stringify(trades));
@@ -383,6 +398,15 @@ function addTrade() {
   document.getElementById("preview").style.display = "none";
   document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
   pendingImage = null;
+}
+
+function editDatetime(index) {
+  const current = trades[index].datetime || "";
+  const input = prompt("Edit date/time:", current);
+  if (input === null) return;
+  trades[index].datetime = input.trim() || current;
+  localStorage.setItem("trades", JSON.stringify(trades));
+  renderTrades();
 }
 
 function deleteTrade(index) {
