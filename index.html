@@ -143,6 +143,35 @@
       background: #c0392b;
     }
 
+    .tabs {
+      margin: 10px auto 4px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .tab {
+      width: auto;
+      padding: 7px 20px;
+      margin: 0;
+      border-radius: 20px;
+      font-size: 13px;
+      background: #2b0f14;
+      color: #aaa;
+      font-weight: bold;
+    }
+
+    .tab:hover { background: #3a1018; color: white; }
+
+    .tab.active      { background: #5a2a31; color: white; }
+    .tab.win-tab.active  { background: #1b5e20; color: #a5d6a7; }
+    .tab.loss-tab.active { background: #7f0000; color: #ef9a9a; }
+    .tab.be-tab.active   { background: #e65100; color: #ffcc80; }
+
+    .trade.win-trade  { border-left: 3px solid #4caf50; }
+    .trade.loss-trade { border-left: 3px solid #e53935; }
+    .trade.be-trade   { border-left: 3px solid #ffa726; }
+
     /* Lightbox */
     #lightbox {
       display: none;
@@ -181,6 +210,11 @@
 </head>
 <body>
 
+<nav style="background:#2b0f14;padding:12px 0;margin-bottom:10px;">
+  <a href="index.html" style="color:white;text-decoration:none;margin:0 20px;font-weight:bold;opacity:0.6;">Journal</a>
+  <a href="analysis.html" style="color:white;text-decoration:none;margin:0 20px;font-weight:bold;">Analysis</a>
+</nav>
+
 <h1>Trading Journal</h1>
 
 <div class="box">
@@ -209,7 +243,12 @@
   <button onclick="addTrade()">Add Trade</button>
 </div>
 
-<h3>Your Trades</h3>
+<div class="tabs">
+  <button class="tab active" onclick="setTab('All')">All</button>
+  <button class="tab win-tab" onclick="setTab('Win')">Wins</button>
+  <button class="tab loss-tab" onclick="setTab('Loss')">Losses</button>
+  <button class="tab be-tab" onclick="setTab('BE')">BE</button>
+</div>
 <div id="trades"></div>
 
 <!-- Lightbox -->
@@ -221,6 +260,15 @@
 <script>
 let trades = JSON.parse(localStorage.getItem("trades")) || [];
 let pendingImage = null;
+let activeTab = "All";
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+  const map = { All: 0, Win: 1, Loss: 2, BE: 3 };
+  document.querySelectorAll(".tab")[map[tab]].classList.add("active");
+  renderTrades();
+}
 
 function processImageFile(file) {
   if (!file || !file.type.startsWith("image/")) return;
@@ -281,13 +329,22 @@ function renderTrades() {
   const container = document.getElementById("trades");
   container.innerHTML = "";
 
-  trades.forEach((t, index) => {
+  const filtered = activeTab === "All" ? trades : trades.filter(t => t.result === activeTab);
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<p style="color:#aaa;font-size:14px;">No ${activeTab === "All" ? "" : activeTab + " "}trades yet.</p>`;
+    return;
+  }
+
+  filtered.forEach((t) => {
+    const index = trades.indexOf(t);
+    const colorClass = t.result === "Win" ? "win-trade" : t.result === "Loss" ? "loss-trade" : "be-trade";
     const imgHTML = t.image
-      ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${index}')">`
+      ? `<img src="${t.image}" alt="chart" onclick="openLightbox(${index})">`
       : "";
 
     container.innerHTML += `
-      <div class="trade">
+      <div class="trade ${colorClass}">
         <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
         <strong>${t.pair}</strong> - ${t.result}<br>
         RR: ${t.rr || "—"}<br>
