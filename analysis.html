@@ -165,6 +165,48 @@
       font-size: 16px;
     }
 
+    /* ── Word cloud ── */
+    .word-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .word-tag {
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-weight: bold;
+      cursor: default;
+      transition: opacity 0.2s;
+    }
+
+    .word-tag:hover { opacity: 0.8; }
+
+    .word-cols {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .word-col {
+      flex: 1;
+      min-width: 200px;
+      background: #5a2a31;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .word-col-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+
     /* Lightbox */
     #lightbox {
       display: none;
@@ -252,42 +294,107 @@ if (trades.length === 0) {
     };
   }).sort((a,b) => b.total - a.total);
 
-  // ── Insights ──
+  // ── PATTERN ENGINE ──
   const insights = [];
 
+  // Filler words to ignore when scanning notes
+  const STOP = new Set(["i","a","the","and","to","it","in","of","my","was","on","at","had","but","is","so","for","with","not","this","that","then","just","got","got","out","up","be","did","no","too","into","from","after","also","an","as","are","have","its","me","we","they","all","or","if","by"]);
+
+  function tokenize(text) {
+    return text.toLowerCase().replace(/[^a-z\s]/g," ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+  }
+
+  function wordFreq(tradeSet) {
+    const freq = {};
+    tradeSet.forEach(t => tokenize(t.notes || "").forEach(w => { freq[w] = (freq[w]||0)+1; }));
+    return freq;
+  }
+
+  // 1. Pair loss rate
   const worstPair = [...pairStats].sort((a,b) => b.losses - a.losses)[0];
   if (worstPair?.losses > 0) {
     const r = ((worstPair.losses / worstPair.total)*100).toFixed(0);
-    insights.push(`<strong>${worstPair.pair}</strong> has your highest loss rate — <strong>${r}%</strong> (${worstPair.losses}/${worstPair.total} trades lost).`);
+    if (r >= 50) insights.push({ level:"warning", text: `You lose <strong>${r}%</strong> of your <strong>${worstPair.pair}</strong> trades (${worstPair.losses}/${worstPair.total}). Consider cutting your size or skipping this instrument until you identify what's going wrong.` });
+    else insights.push({ level:"info", text: `<strong>${worstPair.pair}</strong> has your most losses at <strong>${r}%</strong> loss rate (${worstPair.losses}/${worstPair.total}).` });
   }
 
-  const bestPair = [...pairStats].sort((a,b) => b.wins - a.wins)[0];
+  // 2. Best pair
+  const bestPair = [...pairStats].sort((a,b) => (b.wins/b.total)-(a.wins/a.total))[0];
   if (bestPair?.wins > 0) {
     const r = ((bestPair.wins / bestPair.total)*100).toFixed(0);
-    insights.push(`<strong>${bestPair.pair}</strong> is your strongest pair — <strong>${r}%</strong> win rate.`);
+    insights.push({ level:"good", text: `<strong>${bestPair.pair}</strong> is your best pair — <strong>${r}%</strong> win rate. Stick to setups that have worked here.` });
   }
 
+  // 3. RR analysis
   const avgW = avgRR(wins), avgL = avgRR(losses);
   if (avgW && avgL) {
     const ratio = (parseFloat(avgW) / parseFloat(avgL)).toFixed(2);
-    insights.push(`Average RR on wins: <strong>${avgW}R</strong> &nbsp;|&nbsp; Average RR on losses: <strong>${avgL}R</strong> (${ratio}x ratio).`);
+    const msg = `Average RR on wins: <strong>${avgW}R</strong> &nbsp;|&nbsp; on losses: <strong>${avgL}R</strong>.`;
+    if (parseFloat(avgL) > parseFloat(avgW)) insights.push({ level:"warning", text: msg + ` You're letting losers run bigger than your winners — this kills your account even with a decent win rate.` });
+    else insights.push({ level:"info", text: msg + ` Your winners are bigger than your losers — good.` });
   }
 
-  // Streak
-  let maxStreak = 0, cur = 0;
-  trades.forEach(t => { t.result === "Loss" ? (cur++, maxStreak = Math.max(maxStreak, cur)) : cur = 0; });
-  if (maxStreak >= 2) insights.push(`Your longest losing streak is <strong>${maxStreak} consecutive losses</strong>.`);
+  // 4. Losing streak
+  let maxStreak = 0, curStreak = 0, currentStreak = 0;
+  trades.forEach(t => {
+    if (t.result === "Loss") { curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
+    else curStreak = 0;
+  });
+  // current streak at end
+  for (let i = trades.length-1; i >= 0; i--) {
+    if (trades[i].result === "Loss") currentStreak++;
+    else break;
+  }
+  if (currentStreak >= 2) insights.push({ level:"warning", text: `You're currently on a <strong>${currentStreak}-loss streak</strong>. Step back and review before your next trade.` });
+  else if (maxStreak >= 3) insights.push({ level:"info", text: `Your longest losing streak was <strong>${maxStreak} in a row</strong>. Make sure you have a rule for when to stop trading for the day.` });
 
-  // Loss note keywords
-  const lossNotes = losses.map(t => (t.notes||"").toLowerCase()).join(" ");
-  const keywords  = ["fomo","revenge","early","late","news","chop","oversize","bored","tired","rushed","random","scared","hesitat"];
-  const found = keywords.filter(k => lossNotes.includes(k));
-  if (found.length) insights.push(`Words appearing in your loss notes: <strong>${found.join(", ")}</strong>.`);
+  // 5. Revenge trading — loss immediately followed by another loss on same pair
+  let revengeCnt = 0;
+  for (let i = 1; i < trades.length; i++) {
+    if (trades[i-1].result === "Loss" && trades[i].result === "Loss" && trades[i-1].pair === trades[i].pair) revengeCnt++;
+  }
+  if (revengeCnt >= 2) insights.push({ level:"warning", text: `Possible <strong>revenge trading</strong> detected — you've taken back-to-back losses on the same pair <strong>${revengeCnt} times</strong>. After a loss, pause before re-entering.` });
 
-  // Win note keywords
-  const winNotes = wins.map(t => (t.notes||"").toLowerCase()).join(" ");
-  const winWords = keywords.filter(k => winNotes.includes(k));
-  if (winWords.length) insights.push(`These words also appear in your <em>win</em> notes: <strong>${winWords.join(", ")}</strong> — review if they cost you on winning days.`);
+  // 6. Word frequency on loss notes vs win notes
+  const lossFreq = wordFreq(losses);
+  const winFreq  = wordFreq(wins);
+
+  // Words that appear WAY more in losses than wins (signal words)
+  const lossSignal = Object.entries(lossFreq)
+    .filter(([w, c]) => c >= 2 && (winFreq[w]||0) < c)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0,6)
+    .map(([w]) => w);
+
+  if (lossSignal.length >= 2) {
+    insights.push({ level:"warning", text: `Your loss notes repeatedly mention: <strong>${lossSignal.join(", ")}</strong>. These are your red-flag words — if you're thinking any of these before a trade, sit on your hands.` });
+  }
+
+  // 7. Top word in wins
+  const winSignal = Object.entries(winFreq)
+    .filter(([w, c]) => c >= 2 && (lossFreq[w]||0) < c)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0,4)
+    .map(([w]) => w);
+
+  if (winSignal.length >= 2) insights.push({ level:"good", text: `Your win notes often contain: <strong>${winSignal.join(", ")}</strong>. These are conditions or mindsets that seem to lead to wins — look for them before entering.` });
+
+  // 8. Win rate trend (first half vs second half)
+  if (total >= 6) {
+    const half = Math.floor(total/2);
+    const early = trades.slice(0, half);
+    const recent = trades.slice(half);
+    const earlyWR = (early.filter(t=>t.result==="Win").length / half * 100).toFixed(0);
+    const recentWR = (recent.filter(t=>t.result==="Win").length / recent.length * 100).toFixed(0);
+    const diff = parseInt(recentWR) - parseInt(earlyWR);
+    if (diff <= -20) insights.push({ level:"warning", text: `Your win rate has <strong>dropped ${Math.abs(diff)}%</strong> recently (${earlyWR}% early → ${recentWR}% recent). Something has changed in your execution or market conditions.` });
+    else if (diff >= 20) insights.push({ level:"good", text: `Your win rate has <strong>improved ${diff}%</strong> recently (${earlyWR}% early → ${recentWR}% recent). You're getting better — keep going.` });
+  }
+
+  // 9. Overtrading check
+  if (total >= 10 && (losses.length / total) > 0.6) {
+    insights.push({ level:"warning", text: `With a <strong>${winRate}% win rate</strong> across ${total} trades, you may be overtrading or entering low-quality setups. Quality over quantity.` });
+  }
 
   // ── HTML ──
   function pct(n) { return total > 0 ? Math.round((n/total)*100) : 0; }
@@ -371,8 +478,49 @@ if (trades.length === 0) {
     ${insights.length ? `
     <div class="section">
       <div class="section-title" style="margin-top:8px;">Patterns Found</div>
-      ${insights.map(i => `<div class="insight">${i}</div>`).join("")}
+      ${insights.map(i => {
+        const border = i.level === "warning" ? "#e53935" : i.level === "good" ? "#4caf50" : "#8b3a44";
+        const icon   = i.level === "warning" ? "⚠️" : i.level === "good" ? "✅" : "ℹ️";
+        return `<div class="insight" style="border-left-color:${border};">${icon} ${i.text}</div>`;
+      }).join("")}
     </div>` : ""}
+
+    <!-- Word frequency -->
+    ${(Object.keys(lossFreq).length > 0 || Object.keys(winFreq).length > 0) ? (() => {
+      // Top 12 loss words, sized by frequency
+      const lossTop = Object.entries(lossFreq).sort((a,b)=>b[1]-a[1]).slice(0,12);
+      const winTop  = Object.entries(winFreq).sort((a,b)=>b[1]-a[1]).slice(0,12);
+      const lossMax = lossTop[0]?.[1] || 1;
+      const winMax  = winTop[0]?.[1] || 1;
+
+      function tag(word, count, maxCount, baseColor, bgAlpha) {
+        const scale = 0.75 + (count / maxCount) * 0.9; // font 0.75em–1.65em
+        const opacity = 0.4 + (count / maxCount) * 0.6;
+        return `<span class="word-tag" style="font-size:${scale.toFixed(2)}em;background:${baseColor};opacity:${opacity.toFixed(2)};color:white;" title="${count}x">${word}</span>`;
+      }
+
+      const lossTags = lossTop.map(([w,c]) => tag(w,c,lossMax,"#7f0000",0.6)).join("");
+      const winTags  = winTop.map(([w,c])  => tag(w,c,winMax,"#1b5e20",0.6)).join("");
+
+      return `
+      <div class="section" style="max-width:760px;">
+        <div class="section-title" style="margin-top:8px;">Journal Word Frequency <span style="font-size:10px;color:#666;">(auto-updates as you log trades)</span></div>
+        <div class="word-cols">
+          ${lossTop.length ? `
+          <div class="word-col">
+            <div class="word-col-title" style="color:#e53935;">⚠ In Your Losses</div>
+            <div class="word-cloud">${lossTags}</div>
+            <div style="font-size:11px;color:#888;margin-top:10px;">Bigger = mentioned more. Avoid these mindsets before entering.</div>
+          </div>` : ""}
+          ${winTop.length ? `
+          <div class="word-col">
+            <div class="word-col-title" style="color:#4caf50;">✓ In Your Wins</div>
+            <div class="word-cloud">${winTags}</div>
+            <div style="font-size:11px;color:#888;margin-top:10px;">Bigger = mentioned more. Look for these conditions before entering.</div>
+          </div>` : ""}
+        </div>
+      </div>`;
+    })() : ""}
 
     <hr class="divider">
 
