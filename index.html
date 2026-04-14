@@ -307,6 +307,12 @@
           <option value="BE">BE</option>
         </select>
 
+        <select id="tradeType">
+          <option value="">Trade Type</option>
+          <option value="Reversal">Reversal</option>
+          <option value="Continuation">Continuation</option>
+        </select>
+
         <input id="rr" placeholder="RR (e.g. 1:2)">
         <input id="notes" placeholder="Notes">
 
@@ -321,12 +327,12 @@
             Checklist
             <span id="grade-live" style="font-weight:bold;font-size:14px;color:#555;">—</span>
           </div>
-          <label class="check-item"><input type="checkbox" id="c-sweep"> Liq. Sweep</label>
-          <label class="check-item"><input type="checkbox" id="c-delivery"> FVG Delivery</label>
+          <label class="check-item"><input type="checkbox" id="c-sweep"> BSL/SSL Swept</label>
+          <label class="check-item"><input type="checkbox" id="c-ifvg"> IFVG Identified</label>
+          <label class="check-item"><input type="checkbox" id="c-valid"> Valid Entry</label>
+          <label class="check-item"><input type="checkbox" id="c-target"> Clear DOL</label>
+          <label class="check-item"><input type="checkbox" id="c-pd"> Correct P/D</label>
           <label class="check-item"><input type="checkbox" id="c-momentum"> No Chop</label>
-          <label class="check-item"><input type="checkbox" id="c-target"> Clear Target</label>
-          <label class="check-item"><input type="checkbox" id="c-singular"> Singular FVG</label>
-          <label class="check-item"><input type="checkbox" id="c-pd"> Prem/Disc</label>
         </div>
       </div>
     </div>
@@ -353,17 +359,16 @@
   let pendingImage = null;
   let activeTab = "All";
 
-  // ── Setup grade ──
+  // ── Setup grade (based on iFVG strategy) ──
+  // Rule #1: BSL/SSL must be swept. No sweep = C (forced trade)
   function calcGrade(c) {
-    const { sweep, delivery, momentum, target, singular, pd } = c;
-    const both   = sweep && delivery;
-    const either = sweep || delivery;
-    if (both   && momentum && target && singular && pd)  return "A+";
-    if (either && momentum && target && singular && pd)  return "A";
-    if (either && target && singular)                    return "A-";
-    if (!either && momentum && target && singular)       return "B+";
-    if (!either && (target || singular))                 return "B";
-    if (!either && momentum)                             return "B-";
+    const { sweep, ifvg, valid, target, pd, momentum } = c;
+    if (sweep && ifvg && momentum && valid && target && pd) return "A+";
+    if (sweep && ifvg && valid && target && pd)             return "A";
+    if (sweep && ifvg && valid && target)                   return "A-";
+    if (sweep && ifvg && target)                            return "B+";
+    if (sweep && target)                                    return "B";
+    if (sweep)                                              return "B-";
     return "C";
   }
 
@@ -377,16 +382,16 @@
     return "#b71c1c";
   }
 
-  const checkIds = ["c-sweep","c-delivery","c-momentum","c-target","c-singular","c-pd"];
+  const checkIds = ["c-sweep","c-ifvg","c-valid","c-target","c-pd","c-momentum"];
 
   function getChecklist() {
     return {
       sweep:    document.getElementById("c-sweep").checked,
-      delivery: document.getElementById("c-delivery").checked,
-      momentum: document.getElementById("c-momentum").checked,
+      ifvg:     document.getElementById("c-ifvg").checked,
+      valid:    document.getElementById("c-valid").checked,
       target:   document.getElementById("c-target").checked,
-      singular: document.getElementById("c-singular").checked,
       pd:       document.getElementById("c-pd").checked,
+      momentum: document.getElementById("c-momentum").checked,
     };
   }
 
@@ -494,9 +499,12 @@
       const gradeHTML = t.grade
         ? `<span style="color:${gradeColor(t.grade)};font-weight:bold;font-size:12px;background:#1a0a0c;padding:1px 7px;border-radius:4px;margin-left:6px;">${t.grade}</span>`
         : "";
+      const typeHTML = t.tradeType
+        ? `<span style="font-size:10px;color:#888;margin-left:6px;">${t.tradeType}</span>`
+        : "";
 
-      const clKeys   = ["sweep","delivery","momentum","target","singular","pd"];
-      const clLabels = ["Sweep","Delivery","Momentum","Target","Singular FVG","Prem/Disc"];
+      const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+      const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
       const checklistHTML = t.checklist
         ? `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px;">` +
           clKeys.map((k,i) =>
@@ -508,7 +516,7 @@
         <div class="trade ${colorClass}">
           <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
           <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit date">${t.datetime || "No date"}</div>
-          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}<br>
+          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
           RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span>
           ${checklistHTML}
           <div style="margin-top:8px;">${t.notes}</div>
@@ -531,9 +539,10 @@
 
     const now = new Date();
     const datetime = now.toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true });
+    const tradeType = document.getElementById("tradeType").value || null;
     const checklist = getChecklist();
     const grade = Object.values(checklist).some(Boolean) ? calcGrade(checklist) : null;
-    const trade = { pair, result, rr, notes, image: pendingImage, datetime, checklist, grade };
+    const trade = { pair, result, rr, notes, image: pendingImage, datetime, checklist, grade, tradeType };
     trades.push(trade);
 
     localStorage.setItem("trades", JSON.stringify(trades));
@@ -541,6 +550,7 @@
 
     document.getElementById("pair").value = "";
     document.getElementById("result").value = "";
+    document.getElementById("tradeType").value = "";
     document.getElementById("rr").value = "";
     document.getElementById("notes").value = "";
     document.getElementById("image").value = "";
