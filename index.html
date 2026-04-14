@@ -2,8 +2,68 @@
 <html>
 <head>
   <title>Trading Journal</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+      padding: 20px;
+    }
+    input, button {
+      margin: 5px;
+      padding: 8px;
+    }
+    .trade {
+      border: 1px solid #444;
+      padding: 10px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Trading Journal</h1>
+
+<h1>Trading Journal</h1>
+
+<h3>Add Trade</h3>
+
+<input id="pair" placeholder="Pair (NQ)">
+<input id="result" placeholder="Win / Loss">
+<input id="notes" placeholder="Notes">
+<button onclick="addTrade()">Add</button>
+
+<h3>Your Trades</h3>
+<div id="trades"></div>
+
+<script>
+let trades = JSON.parse(localStorage.getItem("trades")) || [];
+
+function renderTrades() {
+  const container = document.getElementById("trades");
+  container.innerHTML = "";
+  trades.forEach(t => {
+    container.innerHTML += `
+      <div class="trade">
+        <strong>${t.pair}</strong> - ${t.result}<br>
+        ${t.notes}
+      </div>
+    `;
+  });
+}
+
+function addTrade() {
+  const pair = document.getElementById("pair").value;
+  const result = document.getElementById("result").value;
+  const notes = document.getElementById("notes").value;
+
+  const trade = { pair, result, notes };
+  trades.push(trade);
+
+  localStorage.setItem("trades", JSON.stringify(trades));
+  renderTrades();
+}
+
+renderTrades();
+</script>
+
 </body>
 </html>
