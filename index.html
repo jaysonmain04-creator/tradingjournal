@@ -1084,12 +1084,18 @@
       : "";
 
     const formatNotes = (raw) => {
-      const labels = ["Aligned with analysis","Rules followed","Mindset","Feeling","Would take again"];
+      const labelMap = [
+        { key: "Aligned with analysis", display: "Was the trade aligned with analysis?" },
+        { key: "Rules followed",        display: "Were your rules followed?" },
+        { key: "Mindset",               display: "What was your mindset coming into the market?" },
+        { key: "Feeling",               display: "How did you feel during the trade?" },
+        { key: "Would take again",      display: "Would you take it again?" },
+      ];
       return raw.split("\n").map(line => {
-        for (const lbl of labels) {
-          if (line.startsWith(lbl + ": ")) {
-            const val = line.slice(lbl.length + 2);
-            return `<div style="margin-bottom:10px;"><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#aaa;font-weight:bold;">${lbl}</span><br><span style="font-size:14px;color:#ddd;">${val}</span></div>`;
+        for (const { key, display } of labelMap) {
+          if (line.startsWith(key + ": ")) {
+            const val = line.slice(key.length + 2);
+            return `<div style="margin-bottom:10px;"><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#aaa;font-weight:bold;">${display}</span><br><span style="font-size:14px;color:#ddd;">${val}</span></div>`;
           }
         }
         return `<span style="font-size:14px;color:#ddd;">${line}</span>`;
