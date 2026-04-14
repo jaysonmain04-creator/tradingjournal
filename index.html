@@ -851,7 +851,7 @@
 
     const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
 
-    filtered.forEach((t) => {
+    [...filtered].reverse().forEach((t) => {
       const index = trades.indexOf(t);
       const colorClass = t.result === "Win" ? "win-trade" : t.result === "Loss" ? "loss-trade" : "be-trade";
       const imgHTML = t.image
