@@ -322,23 +322,23 @@
       #note-panel {
         position: fixed;
         top: 0;
-        left: -440px;
-        width: 420px;
+        right: -510px;
+        width: 490px;
         height: 100%;
         background: #1e0d10;
         z-index: 1001;
         display: flex;
         flex-direction: column;
-        transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
-        box-shadow: 4px 0 24px rgba(0,0,0,0.6);
+        transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -4px 0 24px rgba(0,0,0,0.6);
       }
-      #note-panel.open { left: 0; }
+      #note-panel.open { right: 0; }
 
       .note-panel-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 16px 20px;
+        padding: 18px 24px;
         border-bottom: 1px solid #3a1018;
         flex-shrink: 0;
       }
@@ -354,7 +354,7 @@
         color: white;
         border: none;
         border-radius: 6px;
-        padding: 6px 16px;
+        padding: 7px 20px;
         font-size: 13px;
         font-weight: bold;
         cursor: pointer;
@@ -365,40 +365,112 @@
 
       .note-doc {
         flex: 1;
-        display: flex;
-        flex-direction: column;
-        padding: 20px;
-        overflow: hidden;
+        overflow-y: auto;
+        padding: 20px 24px 30px;
       }
+      .note-doc::-webkit-scrollbar { width: 5px; }
+      .note-doc::-webkit-scrollbar-track { background: transparent; }
+      .note-doc::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
 
-      #note-editor {
-        flex: 1;
+      .note-q {
+        margin-bottom: 20px;
+      }
+      .note-q-label {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 7px;
+        display: block;
+      }
+      .note-q textarea {
         width: 100%;
         background: #160a0c;
-        border: none;
-        border-radius: 8px;
+        border: 1px solid #2e1015;
+        border-radius: 7px;
         color: #e8e0e1;
-        font-size: 15px;
+        font-size: 14px;
         font-family: Georgia, serif;
-        line-height: 1.75;
-        padding: 20px;
+        line-height: 1.65;
+        padding: 12px 14px;
         resize: none;
         outline: none;
         box-sizing: border-box;
         caret-color: #c06070;
+        overflow: hidden;
+        min-height: 52px;
+        transition: border-color 0.15s;
       }
-      #note-editor::placeholder { color: #3a1a1f; }
+      .note-q textarea:focus { border-color: #5a2a31; }
+      .note-q textarea::placeholder { color: #3a1a20; font-style: italic; }
 
-      .note-word-count {
-        font-size: 11px;
+      /* Yes / No toggle */
+      .yn-row {
+        display: flex;
+        gap: 8px;
+      }
+      .yn-btn {
+        flex: 1;
+        padding: 9px 0;
+        border-radius: 6px;
+        border: 1.5px solid #2e1015;
+        background: #160a0c;
         color: #555;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+        transition: all 0.15s;
+      }
+      .yn-btn:hover { border-color: #5a2a31; color: #aaa; background: #1e0d10; }
+      .yn-btn.yn-yes.active { background: #1b3a1e; border-color: #4caf50; color: #4caf50; }
+      .yn-btn.yn-no.active  { background: #3a1018; border-color: #e53935; color: #e53935; }
+
+      /* Confidence slider */
+      .conf-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .conf-row input[type="range"] {
+        flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        background: #2e1015;
+        outline: none;
+        padding: 0;
+        margin: 0;
+        border: none;
+        width: auto;
+      }
+      .conf-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #8b3a44;
+        cursor: pointer;
+      }
+      .conf-value {
+        font-size: 20px;
+        font-weight: bold;
+        min-width: 36px;
         text-align: right;
-        padding: 8px 0 0;
-        flex-shrink: 0;
+        color: #ccc;
+      }
+      .conf-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: #555;
+        margin-top: 4px;
       }
 
-      @media (max-width: 480px) {
-        #note-panel { width: 100%; left: -100%; }
+      @media (max-width: 520px) {
+        #note-panel { width: 100%; right: -100%; }
       }
 
     </style>
@@ -487,8 +559,44 @@
       <button class="note-panel-done" onclick="closeNotePanel()">Done</button>
     </div>
     <div class="note-doc">
-      <textarea id="note-editor" placeholder="What happened? Why did you take this trade?&#10;&#10;What did price do? What were you thinking?&#10;&#10;What would you do differently?" oninput="updateWordCount()"></textarea>
-      <div class="note-word-count" id="note-word-count">0 words</div>
+
+      <div class="note-q">
+        <span class="note-q-label">Was the trade aligned with your analysis?</span>
+        <textarea id="nq-analysis" rows="2" placeholder="e.g. Yes — price swept BSL first, IFVG formed exactly where I expected..." oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Were your rules followed?</span>
+        <textarea id="nq-rules" rows="2" placeholder="e.g. Missed valid entry — inversion happened after internal high was taken..." oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Was your mindset in the right place?</span>
+        <textarea id="nq-mindset" rows="2" placeholder="e.g. Felt calm and focused. No revenge, no FOMO. Just waited for the setup..." oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">How did you feel coming into this trade?</span>
+        <textarea id="nq-feeling" rows="2" placeholder="e.g. A little anxious after yesterday's loss, but the setup was clear..." oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">If this setup appeared again, would you take it?</span>
+        <div class="yn-row">
+          <button type="button" class="yn-btn yn-yes" id="yn-yes" onclick="setYN('yes')">Yes</button>
+          <button type="button" class="yn-btn yn-no"  id="yn-no"  onclick="setYN('no')">No</button>
+        </div>
+      </div>
+
+      <div class="note-q" style="margin-top:24px;">
+        <span class="note-q-label">How confident were you? &nbsp;<span id="conf-value-label" style="color:#8b3a44;font-size:13px;font-weight:bold;">—</span></span>
+        <div class="conf-row">
+          <input type="range" id="nq-confidence" min="1" max="10" value="5" oninput="updateConfLabel()">
+          <span class="conf-value" id="conf-value-display">—</span>
+        </div>
+        <div class="conf-labels"><span>1 – No conviction</span><span>10 – Full confidence</span></div>
+      </div>
+
     </div>
   </div>
 
@@ -500,43 +608,101 @@
 
   <script>
   let trades = JSON.parse(localStorage.getItem("trades")) || [];
-  let pendingImage = null;
-  let pendingNote  = "";
+  let pendingImage      = null;
+  let pendingNote       = "";
+  let pendingConfidence = null;
+  let pendingYN         = null;  // "yes" | "no" | null
   let activeTab = "All";
 
-  // ── Note panel ──
+  // ── Note panel helpers ──
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }
+
+  function setYN(val) {
+    pendingYN = val;
+    document.getElementById("yn-yes").classList.toggle("active", val === "yes");
+    document.getElementById("yn-no").classList.toggle("active", val  === "no");
+  }
+
+  // Slider starts unset — only "activate" once user moves it
+  let confTouched = false;
+  function updateConfLabel() {
+    confTouched = true;
+    const v = document.getElementById("nq-confidence").value;
+    const col = v >= 8 ? "#4caf50" : v >= 5 ? "#ffa726" : "#e53935";
+    document.getElementById("conf-value-display").textContent = v + "/10";
+    document.getElementById("conf-value-display").style.color = col;
+    document.getElementById("conf-value-label").textContent = v + "/10";
+    document.getElementById("conf-value-label").style.color = col;
+  }
+
   function openNotePanel() {
-    document.getElementById("note-editor").value = pendingNote;
+    // Restore answers
+    document.getElementById("nq-analysis").value  = pendingNoteData.analysis;
+    document.getElementById("nq-rules").value      = pendingNoteData.rules;
+    document.getElementById("nq-mindset").value    = pendingNoteData.mindset;
+    document.getElementById("nq-feeling").value    = pendingNoteData.feeling;
+    // Restore YN
+    if (pendingYN) setYN(pendingYN);
+    // Restore confidence
+    if (pendingConfidence !== null) {
+      confTouched = true;
+      document.getElementById("nq-confidence").value = pendingConfidence;
+      updateConfLabel();
+    } else {
+      document.getElementById("conf-value-display").textContent = "—";
+      document.getElementById("conf-value-label").textContent  = "—";
+      confTouched = false;
+    }
+    // Auto-resize textareas
+    ["nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => autoResize(document.getElementById(id)));
+
     document.getElementById("note-panel").classList.add("open");
     document.getElementById("note-overlay").classList.add("open");
-    updateWordCount();
-    setTimeout(() => document.getElementById("note-editor").focus(), 280);
+    setTimeout(() => document.getElementById("nq-analysis").focus(), 280);
   }
 
   function closeNotePanel() {
-    pendingNote = document.getElementById("note-editor").value;
+    pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
+    pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
+    pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
+    pendingNoteData.feeling  = document.getElementById("nq-feeling").value.trim();
+
+    // Build combined note string
+    const parts = [];
+    if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
+    if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
+    if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
+    if (pendingNoteData.feeling)  parts.push("Feeling: "               + pendingNoteData.feeling);
+    if (pendingYN)                parts.push("Would take again: "      + (pendingYN === "yes" ? "Yes" : "No"));
+    pendingNote = parts.join("\n");
+
+    // Save confidence
+    if (confTouched) pendingConfidence = parseInt(document.getElementById("nq-confidence").value);
+
     document.getElementById("note-panel").classList.remove("open");
     document.getElementById("note-overlay").classList.remove("open");
     updateNoteTrigger();
   }
 
-  function updateWordCount() {
-    const text = document.getElementById("note-editor").value.trim();
-    const words = text ? text.split(/\s+/).length : 0;
-    document.getElementById("note-word-count").textContent = words + " word" + (words !== 1 ? "s" : "");
-  }
+  const pendingNoteData = { analysis: "", rules: "", mindset: "", feeling: "" };
 
   function updateNoteTrigger() {
     const trigger  = document.getElementById("note-trigger");
     const label    = document.getElementById("note-trigger-label");
     const preview  = document.getElementById("note-trigger-preview");
     const icon     = trigger.querySelector(".note-trigger-icon");
-    if (pendingNote.trim()) {
+    const hasContent = pendingNote.trim() || pendingConfidence !== null;
+    if (hasContent) {
       trigger.classList.add("has-note");
       label.textContent = "Edit Note";
       icon.textContent = "✎";
-      const lines = pendingNote.trim().split("\n").filter(l => l.trim());
-      preview.textContent = lines.slice(0, 2).join("\n");
+      const lines = [];
+      if (pendingNote.trim()) lines.push(pendingNote.trim().split("\n")[0]);
+      if (pendingConfidence !== null) lines.push("Confidence: " + pendingConfidence + "/10");
+      preview.textContent = lines.slice(0, 2).join(" · ");
     } else {
       trigger.classList.remove("has-note");
       label.textContent = "Add Note";
@@ -734,7 +900,8 @@
     const tradeType = document.getElementById("tradeType").value || null;
     const checklist = getChecklist();
     const grade = Object.values(checklist).some(Boolean) ? calcGrade(checklist) : null;
-    const trade = { pair, result, rr, notes: pendingNote, image: pendingImage, datetime, checklist, grade, tradeType };
+    const confidence = pendingConfidence || null;
+    const trade = { pair, result, rr, notes: pendingNote, image: pendingImage, datetime, checklist, grade, tradeType, confidence };
     trades.push(trade);
 
     localStorage.setItem("trades", JSON.stringify(trades));
@@ -747,9 +914,19 @@
     document.getElementById("image").value = "";
     document.getElementById("preview").style.display = "none";
     document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
-    document.getElementById("note-editor").value = "";
+    // Reset note panel fields
+    ["nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("nq-confidence").value = 5;
+    document.getElementById("conf-value-display").textContent = "—";
+    document.getElementById("conf-value-label").textContent  = "—";
+    document.getElementById("yn-yes").classList.remove("active");
+    document.getElementById("yn-no").classList.remove("active");
+    pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
     pendingImage = null;
     pendingNote  = "";
+    pendingConfidence = null;
+    pendingYN = null;
+    confTouched = false;
     updateNoteTrigger();
     checkIds.forEach(id => { document.getElementById(id).checked = false; });
     const badge = document.getElementById("grade-live");
