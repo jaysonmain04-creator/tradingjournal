@@ -155,7 +155,50 @@
         box-sizing: border-box;
         text-align: left;
         line-height: 1.5;
+        display: flex;
+        flex-direction: column;
       }
+
+      .trade-body {
+        max-height: 220px;
+        overflow: hidden;
+        position: relative;
+        transition: max-height 0.25s ease;
+        flex: 1;
+      }
+
+      .trade-body.expanded {
+        max-height: 2000px;
+      }
+
+      .trade-body:not(.expanded).overflows::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        background: linear-gradient(transparent, #2b0f14);
+        pointer-events: none;
+      }
+
+      .trade-expand-btn {
+        width: 100%;
+        background: none;
+        border: none;
+        border-top: 1px solid #3a1018;
+        color: #888;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 6px 0 2px;
+        margin-top: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        display: none;
+      }
+
+      .trade-expand-btn:hover { color: #ccc; background: none; }
 
       .trade img {
         width: 100%;
@@ -908,15 +951,39 @@
       container.innerHTML += `
         <div class="trade ${colorClass}">
           <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
-          <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit date">${t.datetime || "No date"}</div>
-          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
-          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span>${qsHTML}
-          ${checklistHTML}
-          <div style="margin-top:8px;">${t.notes}</div>
-          ${imgHTML}
+          <div class="trade-body" id="trade-body-${index}">
+            <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit date">${t.datetime || "No date"}</div>
+            <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
+            RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span>${qsHTML}
+            ${checklistHTML}
+            <div style="margin-top:8px;">${t.notes}</div>
+            ${imgHTML}
+          </div>
+          <button class="trade-expand-btn" id="trade-expand-${index}" onclick="toggleExpand(${index})">Show more ▾</button>
         </div>
       `;
     });
+
+    // Check each card for overflow and show expand button if needed
+    requestAnimationFrame(() => {
+      [...filtered].reverse().forEach((t) => {
+        const index = trades.indexOf(t);
+        const body = document.getElementById("trade-body-" + index);
+        const btn  = document.getElementById("trade-expand-" + index);
+        if (!body || !btn) return;
+        if (body.scrollHeight > body.clientHeight + 2) {
+          body.classList.add("overflows");
+          btn.style.display = "block";
+        }
+      });
+    });
+  }
+
+  function toggleExpand(index) {
+    const body = document.getElementById("trade-body-" + index);
+    const btn  = document.getElementById("trade-expand-" + index);
+    const expanded = body.classList.toggle("expanded");
+    btn.textContent = expanded ? "Show less ▴" : "Show more ▾";
   }
 
   function addTrade() {
