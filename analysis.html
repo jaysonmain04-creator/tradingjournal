@@ -1,1 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trade Analysis</title>
+  <style>
+    * { box-sizing: border-box; }
 
+    body {
+      margin: 0;
+      font-family: Arial;
+      background-color: #401d23;
+      color: white;
+      text-align: center;
+    }
+
+    nav {
+      background: #2b0f14;
+      padding: 12px 0;
+      margin-bottom: 10px;
+    }
+
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin: 0 20px;
+      font-weight: bold;
+    }
+
+    h1 {
+      margin-top: 30px;
+      font-size: 40px;
+    }
+
+    /* ── Stats cards ── */
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 20px 16px 0;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .stat-card {
+      background: #5a2a31;
+      border-radius: 10px;
+      padding: 16px 24px;
+      min-width: 130px;
+      flex: 1;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    /* ── Patterns section ── */
+    .section {
+      max-width: 700px;
+      margin: 24px auto 0;
+      padding: 0 16px;
+      text-align: left;
+    }
+
+    .section-title {
+      font-size: 13px;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .insight {
+      background: #5a2a31;
+      border-left: 3px solid #8b3a44;
+      border-radius: 6px;
+      padding: 11px 14px;
+      margin: 8px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Bar chart ── */
+    .bar-group { margin: 10px 0; }
+
+    .bar-label {
+      font-size: 13px;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .bar-track {
+      background: #2b0f14;
+      border-radius: 4px;
+      height: 16px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .bar-fill { height: 100%; border-radius: 4px; }
+    .bar-fill.win  { background: #4caf50; }
+    .bar-fill.loss { background: #e53935; }
+    .bar-fill.be   { background: #42a5f5; }
+
+    /* ── Trade list ── */
+    .trade-list {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+    }
+
+    .trade {
+      background: #2b0f14;
+      margin: 8px auto;
+      padding: 12px 16px;
+      border-radius: 8px;
+      position: relative;
+      text-align: center;
+    }
+
+    .trade.win-trade  { border-left: 3px solid #4caf50; }
+    .trade.loss-trade { border-left: 3px solid #e53935; }
+    .trade.be-trade   { border-left: 3px solid #42a5f5; }
+
+    .trade img {
+      width: 100%;
+      border-radius: 5px;
+      margin-top: 8px;
+      display: block;
+      cursor: pointer;
+    }
+
+    .trade-date {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .win-text  { color: #4caf50; font-weight: bold; }
+    .loss-text { color: #e53935; font-weight: bold; }
+    .be-text   { color: #42a5f5; font-weight: bold; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #5a2a31;
+      margin: 28px auto;
+      max-width: 500px;
+    }
+
+    .empty {
+      color: #aaa;
+      margin-top: 60px;
+      font-size: 16px;
+    }
+
+    /* Lightbox */
+    #lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+    #lightbox-close {
+      position: fixed; top: 16px; right: 20px;
+      font-size: 28px; cursor: pointer; color: white;
+      font-weight: bold; background: none; border: none;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" style="opacity:0.4;">Journal</a>
+  <a href="analysis.html">Analysis</a>
+</nav>
+
+<h1>Analysis</h1>
+
+<div id="content"></div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="chart">
+</div>
+
+<script>
+const trades = JSON.parse(localStorage.getItem("trades")) || [];
+const content = document.getElementById("content");
+
+document.getElementById("lightbox").addEventListener("click", function(e) {
+  if (e.target === this) closeLightbox();
+});
+
+function closeLightbox() {
+  document.getElementById("lightbox").classList.remove("open");
+}
+
+function openLightbox(src) {
+  document.getElementById("lightbox-img").src = src;
+  document.getElementById("lightbox").classList.add("open");
+}
+
+if (trades.length === 0) {
+  content.innerHTML = `<p class="empty">No trades logged yet. Add some in the Journal first.</p>`;
+} else {
+  const wins   = trades.filter(t => t.result === "Win");
+  const losses = trades.filter(t => t.result === "Loss");
+  const bes    = trades.filter(t => t.result === "BE");
+  const total  = trades.length;
+  const winRate = ((wins.length / total) * 100).toFixed(0);
+
+  // ── RR parsing ──
+  function parseRR(rr) {
+    if (!rr) return null;
+    const c = rr.match(/(\d+\.?\d*)\s*:\s*(\d+\.?\d*)/);
+    if (c) return parseFloat(c[2]) / parseFloat(c[1]);
+    const n = parseFloat(rr);
+    return isNaN(n) ? null : n;
+  }
+  function avgRR(set) {
+    const v = set.map(t => parseRR(t.rr)).filter(x => x !== null);
+    return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(2) : null;
+  }
+
+  // ── Per-pair stats ──
+  const pairs = [...new Set(trades.map(t => t.pair))];
+  const pairStats = pairs.map(p => {
+    const pt = trades.filter(t => t.pair === p);
+    return {
+      pair: p, total: pt.length,
+      wins:   pt.filter(t => t.result === "Win").length,
+      losses: pt.filter(t => t.result === "Loss").length,
+      bes:    pt.filter(t => t.result === "BE").length
+    };
+  }).sort((a,b) => b.total - a.total);
+
+  // ── Insights ──
+  const insights = [];
+
+  const worstPair = [...pairStats].sort((a,b) => b.losses - a.losses)[0];
+  if (worstPair?.losses > 0) {
+    const r = ((worstPair.losses / worstPair.total)*100).toFixed(0);
+    insights.push(`<strong>${worstPair.pair}</strong> has your highest loss rate — <strong>${r}%</strong> (${worstPair.losses}/${worstPair.total} trades lost).`);
+  }
+
+  const bestPair = [...pairStats].sort((a,b) => b.wins - a.wins)[0];
+  if (bestPair?.wins > 0) {
+    const r = ((bestPair.wins / bestPair.total)*100).toFixed(0);
+    insights.push(`<strong>${bestPair.pair}</strong> is your strongest pair — <strong>${r}%</strong> win rate.`);
+  }
+
+  const avgW = avgRR(wins), avgL = avgRR(losses);
+  if (avgW && avgL) {
+    const ratio = (parseFloat(avgW) / parseFloat(avgL)).toFixed(2);
+    insights.push(`Average RR on wins: <strong>${avgW}R</strong> &nbsp;|&nbsp; Average RR on losses: <strong>${avgL}R</strong> (${ratio}x ratio).`);
+  }
+
+  // Streak
+  let maxStreak = 0, cur = 0;
+  trades.forEach(t => { t.result === "Loss" ? (cur++, maxStreak = Math.max(maxStreak, cur)) : cur = 0; });
+  if (maxStreak >= 2) insights.push(`Your longest losing streak is <strong>${maxStreak} consecutive losses</strong>.`);
+
+  // Loss note keywords
+  const lossNotes = losses.map(t => (t.notes||"").toLowerCase()).join(" ");
+  const keywords  = ["fomo","revenge","early","late","news","chop","oversize","bored","tired","rushed","random","scared","hesitat"];
+  const found = keywords.filter(k => lossNotes.includes(k));
+  if (found.length) insights.push(`Words appearing in your loss notes: <strong>${found.join(", ")}</strong>.`);
+
+  // Win note keywords
+  const winNotes = wins.map(t => (t.notes||"").toLowerCase()).join(" ");
+  const winWords = keywords.filter(k => winNotes.includes(k));
+  if (winWords.length) insights.push(`These words also appear in your <em>win</em> notes: <strong>${winWords.join(", ")}</strong> — review if they cost you on winning days.`);
+
+  // ── HTML ──
+  function pct(n) { return total > 0 ? Math.round((n/total)*100) : 0; }
+
+  function barRow(label, count, cls) {
+    const w = pct(count);
+    return `<div class="bar-group">
+      <div class="bar-label"><span>${label}</span><span>${count} (${w}%)</span></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${w}%"></div></div>
+    </div>`;
+  }
+
+  const pairBars = pairStats.map(p => `
+    <div class="bar-group">
+      <div class="bar-label"><span>${p.pair}</span><span>${p.total} trades — W:${p.wins} L:${p.losses} BE:${p.bes}</span></div>
+      <div style="display:flex;gap:3px;height:16px;">
+        <div class="bar-track" style="flex:${p.wins||0.01}"><div class="bar-fill win" style="width:100%"></div></div>
+        <div class="bar-track" style="flex:${p.losses||0.01}"><div class="bar-fill loss" style="width:100%"></div></div>
+        <div class="bar-track" style="flex:${p.bes||0.01}"><div class="bar-fill be" style="width:100%"></div></div>
+      </div>
+    </div>`).join("");
+
+  const resultColor = { Win: "win-text", Loss: "loss-text", BE: "be-text" };
+  const borderClass  = { Win: "win-trade", Loss: "loss-trade", BE: "be-trade" };
+
+  const tradeCards = [...trades].reverse().map((t, ri) => {
+    const i = trades.length - 1 - ri;
+    const imgHTML = t.image
+      ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${t.image.replace(/'/g,"\\'")}'">`
+      : "";
+    return `
+      <div class="trade ${borderClass[t.result] || ''}">
+        <div class="trade-date">${t.datetime || ""}</div>
+        <strong>${t.pair}</strong> - <span class="${resultColor[t.result] || ''}">${t.result}</span><br>
+        RR: ${t.rr || "—"}<br>
+        ${t.notes || ""}
+        ${imgHTML}
+      </div>`;
+  }).join("");
+
+  content.innerHTML = `
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value">${total}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" style="color:#4caf50;">${winRate}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Wins</div>
+        <div class="stat-value" style="color:#4caf50;">${wins.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Losses</div>
+        <div class="stat-value" style="color:#e53935;">${losses.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">BE</div>
+        <div class="stat-value" style="color:#42a5f5;">${bes.length}</div>
+      </div>
+    </div>
+
+    <!-- Overview bars -->
+    <div class="section" style="margin-top:28px;">
+      <div class="section-title">Overview</div>
+      ${barRow("Wins", wins.length, "win")}
+      ${barRow("Losses", losses.length, "loss")}
+      ${barRow("Break Even", bes.length, "be")}
+    </div>
+
+    <!-- By pair -->
+    <div class="section">
+      <div class="section-title" style="margin-top:8px;">By Pair &nbsp;<span style="font-size:11px;color:#4caf50;">■</span> Win &nbsp;<span style="font-size:11px;color:#e53935;">■</span> Loss &nbsp;<span style="font-size:11px;color:#42a5f5;">■</span> BE</div>
+      ${pairBars}
+    </div>
+
+    <!-- Patterns -->
+    ${insights.length ? `
+    <div class="section">
+      <div class="section-title" style="margin-top:8px;">Patterns Found</div>
+      ${insights.map(i => `<div class="insight">${i}</div>`).join("")}
+    </div>` : ""}
+
+    <hr class="divider">
+
+    <!-- All journals -->
+    <div class="section-title" style="margin-top:0;">All Journals (newest first)</div>
+    <div class="trade-list">${tradeCards}</div>
+  `;
+}
+</script>
+
+</body>
+</html>
