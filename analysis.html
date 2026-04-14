@@ -127,6 +127,55 @@
       padding: 12px 16px;
       border-radius: 8px;
       position: relative;
+      text-align: left;
+      line-height: 1.5;
+    }
+
+    .journal-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 16px auto 12px;
+    }
+
+    .jtab {
+      padding: 6px 18px;
+      border-radius: 20px;
+      border: none;
+      font-size: 13px;
+      font-weight: bold;
+      background: #2b0f14;
+      color: #aaa;
+      cursor: pointer;
+      width: auto;
+      margin: 0;
+    }
+
+    .jtab:hover { background: #3a1018; color: #ccc; }
+    .jtab.active { background: #5a2a31; color: white; }
+
+    .pattern-split {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .pattern-col {
+      flex: 1;
+      min-width: 260px;
+      text-align: left;
+    }
+
+    .pattern-col-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+      margin-bottom: 8px;
       text-align: center;
     }
 
@@ -456,6 +505,30 @@ if (trades.length === 0) {
     insights.push({ level:"warning", text: `With a <strong>${winRate}% win rate</strong> across ${total} trades, you may be overtrading or entering low-quality setups. Quality over quantity.` });
   }
 
+  // 10. Confidence analysis
+  const confTrades = trades.filter(t => t.confidence);
+  if (confTrades.length >= 3) {
+    const confWins   = wins.filter(t => t.confidence);
+    const confLosses = losses.filter(t => t.confidence);
+    const avgConfWin  = confWins.length   ? (confWins.reduce((a,t)=>a+t.confidence,0)/confWins.length).toFixed(1)   : null;
+    const avgConfLoss = confLosses.length ? (confLosses.reduce((a,t)=>a+t.confidence,0)/confLosses.length).toFixed(1) : null;
+    if (avgConfWin && avgConfLoss) {
+      if (parseFloat(avgConfLoss) <= 5 && parseFloat(avgConfWin) > parseFloat(avgConfLoss)) {
+        insights.push({ level:"warning", text: `Avg confidence on <strong>losses: ${avgConfLoss}/10</strong> vs <strong>wins: ${avgConfWin}/10</strong>. You're entering your worst trades with low conviction — if confidence isn't there, skip it.` });
+      } else {
+        insights.push({ level:"info", text: `Avg confidence — wins: <strong>${avgConfWin}/10</strong> | losses: <strong>${avgConfLoss}/10</strong>.` });
+      }
+    }
+    const lowConfLosses = losses.filter(t => t.confidence && t.confidence <= 4).length;
+    if (lowConfLosses >= 2) {
+      insights.push({ level:"warning", text: `<strong>${lowConfLosses} losses</strong> were entered with confidence ≤ 4/10. Low conviction is costing you — use confidence as a hard filter.` });
+    }
+    const highConfWinCount = wins.filter(t => t.confidence && t.confidence >= 8).length;
+    if (highConfWinCount >= 2) {
+      insights.push({ level:"good", text: `<strong>${highConfWinCount} wins</strong> were taken at confidence 8+/10. Your highest conviction trades perform best — lean into them.` });
+    }
+  }
+
   // ── HTML ──
   function pct(n) { return total > 0 ? Math.round((n/total)*100) : 0; }
 
@@ -584,10 +657,145 @@ if (trades.length === 0) {
 
     <hr class="divider">
 
-    <!-- All journals -->
-    <div class="section-title" style="margin-top:0;">All Journals (newest first)</div>
-    <div class="trade-list">${tradeCards}</div>
+    <!-- Split patterns: Losses vs Wins -->
+    <div class="section-title" style="margin-top:0;">Patterns by Result</div>
+    <div class="pattern-split">
+
+      <!-- Loss patterns -->
+      <div class="pattern-col">
+        <div class="pattern-col-title" style="color:#e53935;">Loss Patterns</div>
+        ${(() => {
+          const lossInsights = [];
+          if (losses.length === 0) return `<div class="insight" style="border-left-color:#555;color:#aaa;">No losses logged yet.</div>`;
+
+          // Forced trade detection
+          const forcedLosses = losses.filter(t => /forced|told myself|shouldnt have|shouldn't|no trade day|shouldn't|didn't want|didnt want/i.test(t.notes||""));
+          if (forcedLosses.length >= 1) lossInsights.push(`<strong>${forcedLosses.length}</strong> loss${forcedLosses.length>1?"es":""} where you noted you <strong>shouldn't have taken the trade</strong>. Your gut was right — trust it next time.`);
+
+          // Winning day chasing
+          const winDayLosses = losses.filter(t => /winning day|win today|hoping|emotions|emotional|wanted.*win/i.test(t.notes||""));
+          if (winDayLosses.length >= 1) lossInsights.push(`<strong>${winDayLosses.length}</strong> loss${winDayLosses.length>1?"es":""} tied to <strong>chasing a winning day</strong> or emotional motivation. These are your most avoidable losses.`);
+
+          // News/FOMC
+          const newsLosses = losses.filter(t => /fomc|news|overnight|trump|fed|report|geopolit/i.test(t.notes||""));
+          if (newsLosses.length >= 1) lossInsights.push(`<strong>${newsLosses.length}</strong> loss${newsLosses.length>1?"es":""} on <strong>high-impact news days</strong>. Consider a strict no-trade rule on FOMC/major news.`);
+
+          // NY Open unswept
+          const nyLosses = losses.filter(t => /ny open|nyopen|new york open/i.test(t.notes||""));
+          if (nyLosses.length >= 1) lossInsights.push(`<strong>${nyLosses.length}</strong> loss${nyLosses.length>1?"es":""} where <strong>NY Open hadn't been swept</strong>. That level kept stopping you — make it a filter.`);
+
+          // Wrong draw/targets
+          const drawLosses = losses.filter(t => /draw.*wrong|wrong.*draw|wrong.*target|target.*wrong|delivers|delivery/i.test(t.notes||""));
+          if (drawLosses.length >= 1) lossInsights.push(`<strong>${drawLosses.length}</strong> loss${drawLosses.length>1?"es":""} from <strong>wrong draws on liquidity</strong>. Good execution, wrong target — a refinement issue not a discipline issue.`);
+
+          // Scared / low confidence
+          const scaredLosses = losses.filter(t => /scared|fear|nervous|not confident|wasn't confident|wasnt confident|size down/i.test(t.notes||""));
+          if (scaredLosses.length >= 1) lossInsights.push(`<strong>${scaredLosses.length}</strong> loss${scaredLosses.length>1?"es":""} where you noted <strong>low confidence or fear</strong>. If you're sizing down because you're unsure, that's a signal to skip the trade entirely.`);
+
+          // Shorts into strength
+          const counterLosses = losses.filter(t => /wanted short|shorts.*higher|counter|against.*trend|fighting/i.test(t.notes||""));
+          if (counterLosses.length >= 1) lossInsights.push(`<strong>${counterLosses.length}</strong> loss${counterLosses.length>1?"es":""} from <strong>fighting the trend</strong> — wanting shorts while price pushed higher. Wait for delivery, don't predict reversals.`);
+
+          // Low confidence losses
+          const lowConfLoss = losses.filter(t => t.confidence && t.confidence <= 4);
+          if (lowConfLoss.length >= 1) lossInsights.push(`<strong>${lowConfLoss.length}</strong> loss${lowConfLoss.length>1?"es":""} entered with <strong>confidence ≤ 4/10</strong>. You knew the trade felt weak — that feeling is data. Use it as a hard filter.`);
+
+          // Medium confidence losses (5-6)
+          const midConfLoss = losses.filter(t => t.confidence && t.confidence >= 5 && t.confidence <= 6);
+          if (midConfLoss.length >= 2) lossInsights.push(`<strong>${midConfLoss.length}</strong> loss${midConfLoss.length>1?"es":""} at <strong>confidence 5–6/10</strong>. Mediocre conviction = mediocre results. Raise your minimum confidence threshold.`);
+
+          if (lossInsights.length === 0) lossInsights.push("Not enough note detail yet to detect specific loss patterns. Keep journaling.");
+
+          return lossInsights.map(t => `<div class="insight" style="border-left-color:#e53935;">⚠️ ${t}</div>`).join("");
+        })()}
+      </div>
+
+      <!-- Win patterns -->
+      <div class="pattern-col">
+        <div class="pattern-col-title" style="color:#4caf50;">Win Patterns</div>
+        ${(() => {
+          if (wins.length === 0) return `<div class="insight" style="border-left-color:#555;color:#aaa;">No wins logged yet.</div>`;
+          const winInsights = [];
+
+          // Calm/relaxed mindset wins
+          const calmWins = wins.filter(t => /calm|relaxed|chilling|chill|patient|waited|confident|good mindset|right place/i.test(t.notes||""));
+          if (calmWins.length >= 1) winInsights.push(`<strong>${calmWins.length}</strong> win${calmWins.length>1?"s":""} where you noted being <strong>calm or in the right headspace</strong>. Your best trades come when you're relaxed.`);
+
+          // Followed rules
+          const ruleWins = wins.filter(t => /followed.*rules|rules.*followed|waited.*setup|best setup|my rules/i.test(t.notes||""));
+          if (ruleWins.length >= 1) winInsights.push(`<strong>${ruleWins.length}</strong> win${ruleWins.length>1?"s":""} where you explicitly <strong>followed your rules</strong> and waited for the best setup.`);
+
+          // Strong confluence
+          const confWins = wins.filter(t => /confluence|liquidity|sweep|momentum|strong|setup|signal/i.test(t.notes||""));
+          if (confWins.length >= 1) winInsights.push(`<strong>${confWins.length}</strong> win${confWins.length>1?"s":""} with notes mentioning <strong>strong confluence or clear setups</strong> — these are your A+ trades.`);
+
+          // High confidence wins
+          const highConfWins = wins.filter(t => (t.confidence || 0) >= 8);
+          if (highConfWins.length >= 1) winInsights.push(`<strong>${highConfWins.length}</strong> win${highConfWins.length>1?"s":""} logged with <strong>confidence 8+/10</strong>. High conviction trades are performing.`);
+
+          // Average confidence on wins
+          const confWinSet = wins.filter(t => t.confidence);
+          if (confWinSet.length >= 2) {
+            const avgCW = (confWinSet.reduce((a,t)=>a+t.confidence,0)/confWinSet.length).toFixed(1);
+            winInsights.push(`Average confidence on your wins: <strong>${avgCW}/10</strong>. Trades above this mark tend to pay — below it, think twice.`);
+          }
+
+          if (winInsights.length === 0) winInsights.push("Keep adding detailed notes to your wins — patterns will surface here as you journal more.");
+
+          return winInsights.map(t => `<div class="insight" style="border-left-color:#4caf50;">✅ ${t}</div>`).join("");
+        })()}
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Tabbed journals -->
+    <div class="section-title" style="margin-top:0;">Journals</div>
+    <div class="journal-tabs">
+      <button class="jtab active" onclick="filterJournals('all',this)">All</button>
+      <button class="jtab" onclick="filterJournals('win',this)">Wins</button>
+      <button class="jtab" onclick="filterJournals('loss',this)">Losses</button>
+      <button class="jtab" onclick="filterJournals('be',this)">BE</button>
+    </div>
+    <div class="trade-list" id="journal-list"></div>
   `;
+
+  // ── Journal card renderer ──
+  function buildJournalCards(filter) {
+    const list = document.getElementById("journal-list");
+    if (!list) return;
+    const filtered = filter === "all" ? trades : trades.filter(t => t.result.toLowerCase() === filter);
+    if (filtered.length === 0) {
+      list.innerHTML = `<p style="color:#aaa;font-size:14px;text-align:center;">No ${filter === "all" ? "" : filter} trades yet.</p>`;
+      return;
+    }
+    const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
+    const borderClass  = { Win: "win-trade", Loss: "loss-trade", BE: "be-trade" };
+    list.innerHTML = [...filtered].reverse().map(t => {
+      const color = resultColor[t.result] || "white";
+      const cls   = borderClass[t.result] || "";
+      const imgHTML = t.image ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${t.image.replace(/'/g,"\\'")}')">` : "";
+      const conf = t.confidence;
+      const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
+      const confLabel = conf ? `${conf}/10` : "—/10";
+      return `
+        <div class="trade ${cls}">
+          <div class="trade-date">${t.datetime || "No date"}</div>
+          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span><br>
+          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;">${confLabel}</span>
+          <div style="margin-top:8px;">${t.notes || ""}</div>
+          ${imgHTML}
+        </div>`;
+    }).join("");
+  }
+
+  buildJournalCards("all");
+
+  window.filterJournals = function(type, btn) {
+    document.querySelectorAll(".jtab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    buildJournalCards(type);
+  };
 }
 </script>
 
