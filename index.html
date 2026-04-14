@@ -19,14 +19,14 @@
     .box {
       margin: 40px auto;
       padding: 20px;
-      width: 300px;
+      width: 320px;
       background: #5a2a31;
       border-radius: 10px;
       box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
 
-    input {
-      width: 90%;
+    input, select {
+      width: 95%;
       padding: 10px;
       margin: 5px;
       border-radius: 5px;
@@ -55,25 +55,13 @@
       background: #2b0f14;
       margin: 10px auto;
       padding: 10px;
-      width: 300px;
+      width: 320px;
       border-radius: 8px;
-      position: relative;
     }
 
     .delete-btn {
-      position: absolute;
-      top: 8px;
-      right: 10px;
-      width: auto;
-      padding: 3px 8px;
-      margin: 0;
-      background: #6b1a22;
-      font-size: 12px;
-      border-radius: 4px;
-    }
-
-    .delete-btn:hover {
-      background: #c0392b;
+      background: red;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -82,9 +70,29 @@
 <h1>Trading Journal</h1>
 
 <div class="box">
-  <input id="pair" placeholder="Index">
-  <input id="result" placeholder="Win / Loss">
+
+  <!-- Pair Dropdown -->
+  <select id="pair">
+    <option value="">Select Pair</option>
+    <option value="NQ">NQ</option>
+    <option value="ES">ES</option>
+    <option value="MNQ">MNQ</option>
+  </select>
+
+  <!-- Result Dropdown -->
+  <select id="result">
+    <option value="">Select Result</option>
+    <option value="Win">Win</option>
+    <option value="Loss">Loss</option>
+    <option value="BE">BE</option>
+  </select>
+
+  <!-- RR Input -->
+  <input id="rr" placeholder="RR (e.g. 1:2)">
+
+  <!-- Notes -->
   <input id="notes" placeholder="Notes">
+
   <button onclick="addTrade()">Add Trade</button>
 </div>
 
@@ -101,9 +109,11 @@ function renderTrades() {
   trades.forEach((t, index) => {
     container.innerHTML += `
       <div class="trade">
-        <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
         <strong>${t.pair}</strong> - ${t.result}<br>
+        RR: ${t.rr}<br>
         ${t.notes}
+        <br>
+        <button class="delete-btn" onclick="deleteTrade(${index})">Delete</button>
       </div>
     `;
   });
@@ -112,21 +122,24 @@ function renderTrades() {
 function addTrade() {
   const pair = document.getElementById("pair").value;
   const result = document.getElementById("result").value;
+  const rr = document.getElementById("rr").value;
   const notes = document.getElementById("notes").value;
 
   if (!pair || !result) {
-    alert("Fill in Pair and Result");
+    alert("Select pair and result");
     return;
   }
 
-  const trade = { pair, result, notes };
+  const trade = { pair, result, rr, notes };
   trades.push(trade);
 
   localStorage.setItem("trades", JSON.stringify(trades));
   renderTrades();
 
+  // clear inputs
   document.getElementById("pair").value = "";
   document.getElementById("result").value = "";
+  document.getElementById("rr").value = "";
   document.getElementById("notes").value = "";
 }
 
