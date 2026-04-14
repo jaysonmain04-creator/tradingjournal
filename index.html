@@ -355,12 +355,16 @@
         : "";
       const color = resultColor[t.result] || "white";
 
+      const conf = t.confidence;
+      const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
+      const confLabel = conf ? `${conf}/10` : "—/10";
+
       container.innerHTML += `
         <div class="trade ${colorClass}">
           <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
-          <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit">${t.datetime || "No date"}</div>
+          <div class="trade-date" onclick="editDatetime(${index})" title="Click to edit date">${t.datetime || "No date"}</div>
           <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span><br>
-          RR: ${t.rr || "—"}<br>
+          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;cursor:pointer;" onclick="editConfidence(${index})" title="Click to edit">${confLabel}</span><br>
           ${t.notes}
           ${imgHTML}
         </div>
@@ -402,6 +406,17 @@
     const input = prompt("Edit date/time:", current);
     if (input === null) return;
     trades[index].datetime = input.trim() || current;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+  }
+
+  function editConfidence(index) {
+    const current = trades[index].confidence || "";
+    const input = prompt("Confidence level (1–10):", current);
+    if (input === null) return;
+    const num = parseInt(input);
+    if (isNaN(num) || num < 1 || num > 10) { alert("Enter a number between 1 and 10."); return; }
+    trades[index].confidence = num;
     localStorage.setItem("trades", JSON.stringify(trades));
     renderTrades();
   }
