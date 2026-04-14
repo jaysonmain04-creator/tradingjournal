@@ -57,6 +57,23 @@
       padding: 10px;
       width: 300px;
       border-radius: 8px;
+      position: relative;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: auto;
+      padding: 3px 8px;
+      margin: 0;
+      background: #6b1a22;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+
+    .delete-btn:hover {
+      background: #c0392b;
     }
   </style>
 </head>
@@ -81,9 +98,10 @@ function renderTrades() {
   const container = document.getElementById("trades");
   container.innerHTML = "";
 
-  trades.forEach((t) => {
+  trades.forEach((t, index) => {
     container.innerHTML += `
       <div class="trade">
+        <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
         <strong>${t.pair}</strong> - ${t.result}<br>
         ${t.notes}
       </div>
@@ -107,10 +125,15 @@ function addTrade() {
   localStorage.setItem("trades", JSON.stringify(trades));
   renderTrades();
 
-  // clear inputs after adding
   document.getElementById("pair").value = "";
   document.getElementById("result").value = "";
   document.getElementById("notes").value = "";
+}
+
+function deleteTrade(index) {
+  trades.splice(index, 1);
+  localStorage.setItem("trades", JSON.stringify(trades));
+  renderTrades();
 }
 
 renderTrades();
