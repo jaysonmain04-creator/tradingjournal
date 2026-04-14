@@ -46,6 +46,50 @@
       padding-right: 28px;
     }
 
+    .file-label {
+      display: block;
+      width: 90%;
+      padding: 10px;
+      margin: 5px auto;
+      border-radius: 5px;
+      background: #2b0f14;
+      color: #aaa;
+      font-size: 14px;
+      box-sizing: border-box;
+      cursor: pointer;
+      text-align: left;
+      border: 2px dashed transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .file-label:hover {
+      background: #3a1018;
+    }
+
+    .file-label.drag-over {
+      border-color: #8b3a44;
+      background: #3a1018;
+      color: white;
+    }
+
+    #image {
+      display: none;
+    }
+
+    #preview {
+      display: none;
+      width: 90%;
+      margin: 6px auto 0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    #preview img {
+      width: 100%;
+      border-radius: 5px;
+      display: block;
+    }
+
     button {
       width: 93%;
       padding: 10px;
@@ -74,6 +118,14 @@
       text-align: center;
     }
 
+    .trade img {
+      width: 100%;
+      border-radius: 5px;
+      margin-top: 8px;
+      display: block;
+      cursor: pointer;
+    }
+
     .delete-btn {
       position: absolute;
       top: 8px;
@@ -89,6 +141,41 @@
 
     .delete-btn:hover {
       background: #c0392b;
+    }
+
+    /* Lightbox */
+    #lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #lightbox.open {
+      display: flex;
+    }
+
+    #lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+    }
+
+    #lightbox-close {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      font-size: 28px;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+      background: none;
+      border: none;
+      width: auto;
+      padding: 0;
     }
   </style>
 </head>
@@ -114,26 +201,98 @@
   <input id="rr" placeholder="RR (e.g. 1:2)">
   <input id="notes" placeholder="Notes">
 
+  <label class="file-label" for="image" id="file-label-text" id="drop-zone">📎 Click, drag & drop, or paste (Ctrl+V)</label>
+  <input type="file" id="image" accept="image/*">
+
+  <div id="preview"><img id="preview-img" src="" alt="preview"></div>
+
   <button onclick="addTrade()">Add Trade</button>
 </div>
 
 <h3>Your Trades</h3>
 <div id="trades"></div>
 
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="chart">
+</div>
+
 <script>
 let trades = JSON.parse(localStorage.getItem("trades")) || [];
+let pendingImage = null;
+
+function processImageFile(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement("canvas");
+      const maxW = 1200;
+      const scale = img.width > maxW ? maxW / img.width : 1;
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      pendingImage = canvas.toDataURL("image/jpeg", 0.8);
+      document.getElementById("preview-img").src = pendingImage;
+      document.getElementById("preview").style.display = "block";
+      document.getElementById("file-label-text").textContent = "📎 " + (file.name || "pasted image");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Click to pick file
+document.getElementById("image").addEventListener("change", function () {
+  processImageFile(this.files[0]);
+});
+
+// Drag & drop
+const dropZone = document.querySelector(".file-label");
+dropZone.addEventListener("dragover", function (e) {
+  e.preventDefault();
+  this.classList.add("drag-over");
+});
+dropZone.addEventListener("dragleave", function () {
+  this.classList.remove("drag-over");
+});
+dropZone.addEventListener("drop", function (e) {
+  e.preventDefault();
+  this.classList.remove("drag-over");
+  const file = e.dataTransfer.files[0];
+  processImageFile(file);
+});
+
+// Paste (Ctrl+V anywhere on page)
+document.addEventListener("paste", function (e) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      processImageFile(item.getAsFile());
+      break;
+    }
+  }
+});
 
 function renderTrades() {
   const container = document.getElementById("trades");
   container.innerHTML = "";
 
   trades.forEach((t, index) => {
+    const imgHTML = t.image
+      ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${index}')">`
+      : "";
+
     container.innerHTML += `
       <div class="trade">
         <button class="delete-btn" onclick="deleteTrade(${index})">✕</button>
         <strong>${t.pair}</strong> - ${t.result}<br>
         RR: ${t.rr || "—"}<br>
         ${t.notes}
+        ${imgHTML}
       </div>
     `;
   });
@@ -150,7 +309,7 @@ function addTrade() {
     return;
   }
 
-  const trade = { pair, result, rr, notes };
+  const trade = { pair, result, rr, notes, image: pendingImage };
   trades.push(trade);
 
   localStorage.setItem("trades", JSON.stringify(trades));
@@ -160,6 +319,10 @@ function addTrade() {
   document.getElementById("result").value = "";
   document.getElementById("rr").value = "";
   document.getElementById("notes").value = "";
+  document.getElementById("image").value = "";
+  document.getElementById("preview").style.display = "none";
+  document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
+  pendingImage = null;
 }
 
 function deleteTrade(index) {
@@ -167,6 +330,21 @@ function deleteTrade(index) {
   localStorage.setItem("trades", JSON.stringify(trades));
   renderTrades();
 }
+
+function openLightbox(index) {
+  document.getElementById("lightbox-img").src = trades[index].image;
+  document.getElementById("lightbox").classList.add("open");
+}
+
+function closeLightbox() {
+  document.getElementById("lightbox").classList.remove("open");
+  document.getElementById("lightbox-img").src = "";
+}
+
+// Close lightbox on background click
+document.getElementById("lightbox").addEventListener("click", function (e) {
+  if (e.target === this) closeLightbox();
+});
 
 renderTrades();
 </script>
