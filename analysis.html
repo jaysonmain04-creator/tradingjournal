@@ -411,17 +411,37 @@ if (trades.length === 0) {
       .filter(w => w.length > 2 && !STOP.has(w));
   }
 
-  function wordFreq(tradeSet) {
-    const freq = {};
-    tradeSet.forEach(t => tokenize(t.notes || "").forEach(w => { freq[w] = (freq[w]||0)+1; }));
-    return freq;
+  // Count each word once per trade (presence, not raw frequency)
+  function wordPresence(tradeSet) {
+    const presence = {};
+    tradeSet.forEach(t => {
+      const words = new Set(tokenize(t.notes || ""));
+      words.forEach(w => { presence[w] = (presence[w]||0)+1; });
+    });
+    return presence;
   }
 
-  // Only surface a word if it's a known trading term OR appears 4+ times
-  function filterRelevant(freq) {
-    return Object.fromEntries(
-      Object.entries(freq).filter(([w, c]) => TRADING_TERMS.has(w) || c >= 4)
-    );
+  // Words significantly more common in one group vs the other
+  // minBias: minimum percentage-point gap to show a word (default 20pp)
+  function biasedWords(srcPresence, othPresence, srcN, othN, minBias = 20) {
+    if (srcN === 0) return [];
+    return Object.entries(srcPresence)
+      .filter(([w, cnt]) => {
+        if (cnt < 2) return false;
+        if (!TRADING_TERMS.has(w) && cnt < 3) return false;
+        const srcPct = (cnt / srcN) * 100;
+        const othPct = ((othPresence[w]||0) / (othN || 1)) * 100;
+        return srcPct - othPct >= minBias;
+      })
+      .map(([w, cnt]) => ({
+        word: w,
+        srcCount: cnt,
+        srcPct: Math.round((cnt / srcN) * 100),
+        othPct: Math.round(((othPresence[w]||0) / (othN || 1)) * 100),
+        bias: Math.round((cnt / srcN) * 100 - ((othPresence[w]||0) / (othN || 1)) * 100)
+      }))
+      .sort((a, b) => b.bias - a.bias)
+      .slice(0, 8);
   }
 
   // 1. Pair loss rate
@@ -469,29 +489,27 @@ if (trades.length === 0) {
   }
   if (revengeCnt >= 2) insights.push({ level:"warning", text: `Possible <strong>revenge trading</strong> detected — you've taken back-to-back losses on the same pair <strong>${revengeCnt} times</strong>. After a loss, pause before re-entering.` });
 
-  // 6. Word frequency on loss notes vs win notes
-  const lossFreq = filterRelevant(wordFreq(losses));
-  const winFreq  = filterRelevant(wordFreq(wins));
+  // 6. Word presence analysis — per-trade, not per-mention
+  const lossPresence = wordPresence(losses);
+  const winPresence  = wordPresence(wins);
+  const lossWords    = biasedWords(lossPresence, winPresence, losses.length, wins.length);
+  const winWords     = biasedWords(winPresence,  lossPresence, wins.length, losses.length);
 
-  // Words that appear WAY more in losses than wins (signal words)
-  const lossSignal = Object.entries(lossFreq)
-    .filter(([w, c]) => c >= 2 && (winFreq[w]||0) < c)
-    .sort((a,b) => b[1]-a[1])
-    .slice(0,6)
-    .map(([w]) => w);
-
-  if (lossSignal.length >= 2) {
-    insights.push({ level:"warning", text: `Your loss notes repeatedly mention: <strong>${lossSignal.join(", ")}</strong>. These are your red-flag words — if you're thinking any of these before a trade, sit on your hands.` });
+  // Surface top loss-biased words as a pattern insight
+  if (lossWords.length >= 2) {
+    const top = lossWords.slice(0, 5).map(w => `<strong>${w.word}</strong>`).join(", ");
+    insights.push({ level:"warning", text: `Red-flag thoughts in your losses: ${top}. If any of these come up before entry, sit on your hands.` });
   }
 
-  // 7. Top word in wins
-  const winSignal = Object.entries(winFreq)
-    .filter(([w, c]) => c >= 2 && (lossFreq[w]||0) < c)
-    .sort((a,b) => b[1]-a[1])
-    .slice(0,4)
-    .map(([w]) => w);
+  // 7. Win-biased words
+  if (winWords.length >= 2) {
+    const top = winWords.slice(0, 4).map(w => `<strong>${w.word}</strong>`).join(", ");
+    insights.push({ level:"good", text: `Winning mindset words: ${top}. When you're thinking like this, your trades tend to work.` });
+  }
 
-  if (winSignal.length >= 2) insights.push({ level:"good", text: `Your win notes often contain: <strong>${winSignal.join(", ")}</strong>. These are conditions or mindsets that seem to lead to wins — look for them before entering.` });
+  // Keep lossFreq/winFreq aliases for legacy HTML section below
+  const lossFreq = lossPresence;
+  const winFreq  = winPresence;
 
   // 8. Win rate trend (first half vs second half)
   if (total >= 6) {
@@ -910,38 +928,33 @@ if (trades.length === 0) {
       }).join("")}
     </div>` : ""}
 
-    <!-- Word frequency -->
-    ${(Object.keys(lossFreq).length > 0 || Object.keys(winFreq).length > 0) ? (() => {
-      // Top 12 loss words, sized by frequency
-      const lossTop = Object.entries(lossFreq).sort((a,b)=>b[1]-a[1]).slice(0,12);
-      const winTop  = Object.entries(winFreq).sort((a,b)=>b[1]-a[1]).slice(0,12);
-      const lossMax = lossTop[0]?.[1] || 1;
-      const winMax  = winTop[0]?.[1] || 1;
-
-      function tag(word, count, maxCount, baseColor, bgAlpha) {
-        const scale = 0.75 + (count / maxCount) * 0.9; // font 0.75em–1.65em
-        const opacity = 0.4 + (count / maxCount) * 0.6;
-        return `<span class="word-tag" style="font-size:${scale.toFixed(2)}em;background:${baseColor};opacity:${opacity.toFixed(2)};color:white;" title="${count}x">${word}</span>`;
+    <!-- Journal thought analysis -->
+    ${(lossWords.length > 0 || winWords.length > 0) ? (() => {
+      function thoughtRow(w, barColor) {
+        return `<div class="bar-group">
+          <div class="bar-label">
+            <span style="font-weight:bold;">${w.word}</span>
+            <span style="font-size:11px;color:#aaa;">${w.srcCount} trade${w.srcCount>1?"s":""} (${w.srcPct}%) &nbsp;vs&nbsp; ${w.othPct}% other</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width:${w.srcPct}%;background:${barColor};"></div></div>
+        </div>`;
       }
-
-      const lossTags = lossTop.map(([w,c]) => tag(w,c,lossMax,"#7f0000",0.6)).join("");
-      const winTags  = winTop.map(([w,c])  => tag(w,c,winMax,"#1b5e20",0.6)).join("");
 
       return `
       <div class="section" style="max-width:760px;">
-        <div class="section-title" style="margin-top:8px;">Journal Word Frequency <span style="font-size:10px;color:#666;">(auto-updates as you log trades)</span></div>
+        <div class="section-title" style="margin-top:8px;">Journal Thought Analysis <span style="font-size:10px;color:#666;">(% of trades containing each word — once per trade)</span></div>
         <div class="word-cols">
-          ${lossTop.length ? `
+          ${lossWords.length ? `
           <div class="word-col">
-            <div class="word-col-title" style="color:#e53935;">⚠ In Your Losses</div>
-            <div class="word-cloud">${lossTags}</div>
-            <div style="font-size:11px;color:#888;margin-top:10px;">Bigger = mentioned more. Avoid these mindsets before entering.</div>
+            <div class="word-col-title" style="color:#e53935;">Red Flag Thoughts</div>
+            <div style="font-size:11px;color:#888;margin-bottom:10px;">These appear significantly more in your losses. If you're writing like this, reconsider the trade.</div>
+            ${lossWords.map(w => thoughtRow(w, "#e53935")).join("")}
           </div>` : ""}
-          ${winTop.length ? `
+          ${winWords.length ? `
           <div class="word-col">
-            <div class="word-col-title" style="color:#4caf50;">✓ In Your Wins</div>
-            <div class="word-cloud">${winTags}</div>
-            <div style="font-size:11px;color:#888;margin-top:10px;">Bigger = mentioned more. Look for these conditions before entering.</div>
+            <div class="word-col-title" style="color:#4caf50;">Winning Thoughts</div>
+            <div style="font-size:11px;color:#888;margin-bottom:10px;">These appear significantly more in your wins. Look for this mindset before entering.</div>
+            ${winWords.map(w => thoughtRow(w, "#4caf50")).join("")}
           </div>` : ""}
         </div>
       </div>`;
