@@ -1081,16 +1081,17 @@ function clearChatKey() {
 function showChatKeyPrompt() {
   document.getElementById("chat-messages").innerHTML = `
     <div style="padding:16px;font-size:13px;color:#ccc;line-height:1.6;">
-      <div style="margin-bottom:12px;">Enter your <strong>OpenAI API key</strong> to start chatting.<br>Saved only in your browser.</div>
-      <input id="api-key-input" type="password" placeholder="sk-..." style="width:100%;padding:8px 10px;border-radius:5px;background:#2b0f14;border:1px solid #8b3a44;color:white;font-size:13px;box-sizing:border-box;outline:none;">
+      <div style="margin-bottom:10px;"><strong style="color:#4caf50;">Free</strong> — no credit card needed.</div>
+      <div style="margin-bottom:12px;">Get a free key at <strong>aistudio.google.com</strong> → Get API key → Create API key. Paste it below:</div>
+      <input id="api-key-input" type="password" placeholder="AIza..." style="width:100%;padding:8px 10px;border-radius:5px;background:#2b0f14;border:1px solid #8b3a44;color:white;font-size:13px;box-sizing:border-box;outline:none;">
       <button id="chat-save-btn" onclick="saveChatKey()">Save &amp; Start Chat</button>
-      <div style="margin-top:10px;font-size:11px;color:#666;">platform.openai.com/api-keys · Uses gpt-4o-mini</div>
+      <div style="margin-top:10px;font-size:11px;color:#666;">Uses Google Gemini Flash — completely free</div>
     </div>`;
 }
 
 function saveChatKey() {
   const val = (document.getElementById("api-key-input")?.value || "").trim();
-  if (!val.startsWith("sk-")) { alert("Enter a valid OpenAI key (starts with sk-)"); return; }
+  if (!val.startsWith("AIza")) { alert("Enter a valid Gemini key (starts with AIza)"); return; }
   localStorage.setItem("ai_api_key", val);
   initChat();
 }
@@ -1133,13 +1134,16 @@ async function sendChatMsg() {
   _chatHistory.push({ role: "user", content: text });
   const tid = _appendChatMsg("assistant", null, true);
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const geminiHistory = _chatHistory.map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        max_tokens: 600,
-        messages: [{ role: "system", content: _chatSystem }, ..._chatHistory]
+        system_instruction: { parts: [{ text: _chatSystem }] },
+        contents: geminiHistory
       })
     });
     document.getElementById(tid)?.remove();
@@ -1149,7 +1153,7 @@ async function sendChatMsg() {
       return;
     }
     const data = await res.json();
-    const reply = data.choices[0].message.content;
+    const reply = data.candidates[0].content.parts[0].text;
     _chatHistory.push({ role: "assistant", content: reply });
     _appendChatMsg("assistant", reply);
   } catch {
