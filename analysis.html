@@ -274,55 +274,6 @@
       font-weight: bold; background: none; border: none;
     }
 
-    /* ── AI Chat Widget ── */
-    #chat-fab {
-      position: fixed; top: 12px; right: 16px;
-      width: 40px; height: 40px; border-radius: 50%;
-      background: #8b3a44; border: 2px solid #a84452;
-      color: white; font-size: 18px; cursor: pointer;
-      z-index: 1001; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-    }
-    #chat-fab:hover { background: #a84452; }
-    #chat-panel {
-      display: none; position: fixed; top: 60px; right: 16px;
-      width: 320px; height: 460px; background: #1a0a0c;
-      border: 1px solid #5a2a31; border-radius: 12px;
-      z-index: 1000; flex-direction: column;
-      box-shadow: 0 6px 28px rgba(0,0,0,0.7); overflow: hidden;
-    }
-    #chat-panel.open { display: flex; }
-    #chat-messages { flex: 1; overflow-y: auto; padding: 4px 0; }
-    #chat-input-row {
-      padding: 8px; border-top: 1px solid #2b1015;
-      display: flex; gap: 6px; flex-shrink: 0;
-    }
-    #chat-input {
-      flex: 1; min-width: 0; width: auto;
-      padding: 8px 10px; margin: 0; border-radius: 6px;
-      font-size: 13px; background: #2b1015;
-      border: 1px solid #5a2a31; color: white; outline: none;
-    }
-    #chat-send {
-      padding: 8px 12px; background: #8b3a44; border: none;
-      border-radius: 6px; color: white; cursor: pointer;
-      font-size: 13px; flex-shrink: 0;
-    }
-    #chat-send:hover { background: #a84452; }
-    #chat-key-btn, #chat-close-btn {
-      background: none; border: none; padding: 3px 7px;
-      cursor: pointer; color: #888; font-size: 14px;
-    }
-    #chat-key-btn:hover, #chat-close-btn:hover {
-      color: #ccc; background: rgba(255,255,255,0.06); border-radius: 4px;
-    }
-    #chat-save-btn {
-      width: 100%; padding: 9px; margin-top: 8px;
-      background: #8b3a44; border: none; border-radius: 5px;
-      color: white; cursor: pointer; font-size: 13px;
-    }
-    #chat-save-btn:hover { background: #a84452; }
   </style>
 </head>
 <body>
@@ -721,6 +672,164 @@ if (trades.length === 0) {
     ? (scoredTrades.filter(t => t.result === "Loss").reduce((a,t)=>a+t.qs,0) / scoredTrades.filter(t=>t.result==="Loss").length).toFixed(1)
     : null;
 
+  // ── Rule Correlation + Loss DNA ──
+  const dnaKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+  const dnaLabels = ["BSL/SSL Swept","IFVG Identified","Valid Entry","Clear DOL","Correct P/D","No Chop"];
+  const tradesWithCL = trades.filter(t => t.checklist);
+  const lossesWithCL = losses.filter(t => t.checklist);
+
+  // Per-rule: how often broken, WR with vs without
+  const ruleStats = dnaKeys.map((k, i) => {
+    const present = tradesWithCL.filter(t =>  t.checklist[k]);
+    const absent  = tradesWithCL.filter(t => !t.checklist[k]);
+    const pWR = present.length ? Math.round(present.filter(t=>t.result==="Win").length/present.length*100) : null;
+    const aWR = absent.length  ? Math.round(absent.filter(t=>t.result==="Win").length/absent.length*100)   : null;
+    return { label: dnaLabels[i], key: k, broken: absent.length,
+      brokenPct: tradesWithCL.length ? Math.round(absent.length/tradesWithCL.length*100) : 0,
+      presentWR: pWR, absentWR: aWR, impact: (pWR !== null && aWR !== null) ? pWR - aWR : null };
+  });
+
+  // Loss fingerprints: grade + conf band + missing checklist items
+  const fpMap = {};
+  losses.forEach(t => {
+    const g  = t.grade || "–";
+    const cb = !t.confidence ? "no conf" : t.confidence<=4 ? "≤4" : t.confidence<=6 ? "5-6" : "7+";
+    const ms = t.checklist ? dnaKeys.filter(k=>!t.checklist[k]).map((_,i)=>dnaLabels[dnaKeys.indexOf(dnaKeys[i])]) : [];
+    const fp = g+"|"+cb+"|"+ms.join(",");
+    if (!fpMap[fp]) fpMap[fp] = { grade:g, confBand:cb, missing:ms, count:0 };
+    fpMap[fp].count++;
+  });
+  const topLossProfiles = Object.values(fpMap).sort((a,b)=>b.count-a.count).slice(0,5);
+
+  // Highest probability setup: grade + model combo with best WR (min 2 trades)
+  const setupMap = {};
+  trades.forEach(t => {
+    if (!t.grade) return;
+    const key = t.grade + (t.model ? "|"+t.model : "");
+    if (!setupMap[key]) setupMap[key] = { grade: t.grade, model: t.model||"", wins:0, total:0 };
+    setupMap[key].total++;
+    if (t.result === "Win") setupMap[key].wins++;
+  });
+  const bestSetup = Object.values(setupMap)
+    .filter(s => s.total >= 2)
+    .map(s => ({ ...s, wr: Math.round(s.wins/s.total*100) }))
+    .sort((a,b) => b.wr - a.wr || b.total - a.total)[0] || null;
+
+  // Biggest mistake patterns (quantified)
+  const mistakePatterns = [];
+  if (losses.length > 0) {
+    const noSweepL    = losses.filter(t => t.checklist && !t.checklist.sweep);
+    const noIfvgL     = losses.filter(t => t.checklist && t.checklist.sweep && !t.checklist.ifvg);
+    const noValidL    = losses.filter(t => t.checklist && !t.checklist.valid);
+    const lowConfL    = losses.filter(t => t.confidence && t.confidence <= 4);
+    const lowGradeL   = losses.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
+    const forcedL     = losses.filter(t => /forced|shouldnt|shouldn't|didnt want|didn't want|shouldn't/i.test(t.notes||""));
+    const emotionalL  = losses.filter(t => /emotional|emotion|chasing|revenge|frustrated|angry|upset/i.test(t.notes||""));
+    const newsL       = losses.filter(t => /fomc|news|trump|fed|report/i.test(t.notes||""));
+    if (noSweepL.length)    mistakePatterns.push({ label:"Entering without BSL/SSL sweep", count: noSweepL.length, pct: Math.round(noSweepL.length/losses.length*100), color:"#e53935" });
+    if (noValidL.length)    mistakePatterns.push({ label:"Taking invalid entries (IFVG not inverted first)", count: noValidL.length, pct: Math.round(noValidL.length/losses.length*100), color:"#ff7043" });
+    if (noIfvgL.length)     mistakePatterns.push({ label:"No IFVG identified before entry", count: noIfvgL.length, pct: Math.round(noIfvgL.length/losses.length*100), color:"#ffa726" });
+    if (lowConfL.length)    mistakePatterns.push({ label:"Entering at low confidence (≤4/10)", count: lowConfL.length, pct: Math.round(lowConfL.length/losses.length*100), color:"#ffa726" });
+    if (lowGradeL.length)   mistakePatterns.push({ label:"Taking B/C grade setups (below standard)", count: lowGradeL.length, pct: Math.round(lowGradeL.length/losses.length*100), color:"#ff7043" });
+    if (forcedL.length)     mistakePatterns.push({ label:"Forcing trades (noted in journal)", count: forcedL.length, pct: Math.round(forcedL.length/losses.length*100), color:"#e53935" });
+    if (emotionalL.length)  mistakePatterns.push({ label:"Trading emotionally / revenge trading", count: emotionalL.length, pct: Math.round(emotionalL.length/losses.length*100), color:"#e53935" });
+    if (newsL.length)       mistakePatterns.push({ label:"Trading on high-impact news days", count: newsL.length, pct: Math.round(newsL.length/losses.length*100), color:"#ffa726" });
+    mistakePatterns.sort((a,b) => b.count - a.count);
+  }
+
+  const lossDNAHTML = (function() {
+    if (losses.length < 2 && tradesWithCL.length < 2) return "";
+    const sortedRules = [...ruleStats].sort((a,b)=>b.brokenPct-a.brokenPct);
+    const impactRules = [...ruleStats].filter(r=>r.impact!==null).sort((a,b)=>b.impact-a.impact);
+
+    const ruleBreakBars = sortedRules.filter(r=>r.broken>0).map(r => {
+      const impactSign = r.impact !== null ? (r.impact > 0 ? `<span style="color:#4caf50;font-size:11px;">+${r.impact}% WR when followed</span>` : `<span style="color:#888;font-size:11px;">${r.impact}% WR difference</span>`) : "";
+      return `<div class="bar-group">
+        <div class="bar-label">
+          <span>${r.label}</span>
+          <span>broken ${r.broken}x (${r.brokenPct}%) &nbsp;${impactSign}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill loss" style="width:${r.brokenPct}%;"></div></div>
+      </div>`;
+    }).join("");
+
+    const wrCompareRows = impactRules.map(r => {
+      const pwCol = r.presentWR >= 60 ? "#4caf50" : r.presentWR >= 40 ? "#ffa726" : "#e53935";
+      const awCol = r.absentWR  >= 60 ? "#4caf50" : r.absentWR  >= 40 ? "#ffa726" : "#e53935";
+      return `<tr>
+        <td style="padding:5px 8px;color:#ccc;">${r.label}</td>
+        <td style="padding:5px 8px;text-align:center;color:${pwCol};font-weight:bold;">${r.presentWR !== null ? r.presentWR+"%" : "–"}</td>
+        <td style="padding:5px 8px;text-align:center;color:${awCol};">${r.absentWR  !== null ? r.absentWR+"%" : "–"}</td>
+        <td style="padding:5px 8px;text-align:center;color:${r.impact>0?"#4caf50":r.impact<0?"#e53935":"#888"};">${r.impact !== null ? (r.impact>0?"+":"")+r.impact+"%" : "–"}</td>
+      </tr>`;
+    }).join("");
+
+    const profileCards = topLossProfiles.map(p => {
+      const missingStr = p.missing.length ? p.missing.join(", ") : "All rules followed";
+      const col = p.missing.length === 0 ? "#ffa726" : "#e53935";
+      return `<div style="background:#1a1a1a;border:1px solid ${col};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-weight:bold;font-size:13px;">Grade ${p.grade} &nbsp;·&nbsp; Conf ${p.confBand}</span>
+          <span style="background:${col};color:#fff;border-radius:4px;padding:2px 8px;font-size:12px;">${p.count}x</span>
+        </div>
+        <div style="font-size:12px;color:#aaa;">Missing: <span style="color:${col};">${missingStr}</span></div>
+      </div>`;
+    }).join("");
+
+    const bestSetupHTML = bestSetup ? `
+      <div style="background:#0d2a1a;border:1px solid #4caf50;border-radius:8px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:13px;color:#888;margin-bottom:6px;">Your highest probability setup (min 2 trades):</div>
+        <div style="font-size:22px;font-weight:bold;color:#4caf50;">${bestSetup.grade}${bestSetup.model ? " · "+bestSetup.model : ""}</div>
+        <div style="font-size:13px;color:#ccc;margin-top:4px;">${bestSetup.wins}W / ${bestSetup.total-bestSetup.wins}L across ${bestSetup.total} trades &nbsp;·&nbsp; <strong style="color:#4caf50;">${bestSetup.wr}% win rate</strong></div>
+        <div style="font-size:12px;color:#888;margin-top:6px;">Stack the deck: only take trades that match this profile.</div>
+      </div>` : "";
+
+    const mistakeHTML = mistakePatterns.length ? mistakePatterns.map(m =>
+      `<div class="bar-group">
+        <div class="bar-label"><span style="color:${m.color};">${m.label}</span><span>${m.count} loss${m.count>1?"es":""} (${m.pct}% of all losses)</span></div>
+        <div class="bar-track"><div class="bar-fill loss" style="width:${m.pct}%;background:${m.color};"></div></div>
+      </div>`).join("") : `<div style="color:#888;font-size:13px;">Add more notes to your trades — mistake patterns will surface here.</div>`;
+
+    return `
+    <!-- Rule Analysis & Loss DNA -->
+    <hr class="divider">
+    <div class="section-title" style="margin-top:0;">Rule Analysis &amp; Loss DNA</div>
+
+    ${bestSetupHTML}
+
+    ${ruleBreakBars ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;font-size:13px;color:#e53935;">Rules Broken Most Often (in losses)</div>
+      ${ruleBreakBars}
+    </div>` : ""}
+
+    ${wrCompareRows ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;font-size:13px;">Win Rate: Rule Followed vs Broken</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="color:#888;border-bottom:1px solid #333;">
+            <th style="text-align:left;padding:5px 8px;">Rule</th>
+            <th style="padding:5px 8px;">WR (followed)</th>
+            <th style="padding:5px 8px;">WR (broken)</th>
+            <th style="padding:5px 8px;">Impact</th>
+          </tr></thead>
+          <tbody>${wrCompareRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}
+
+    ${mistakePatterns.length ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;font-size:13px;color:#ffa726;">Your Biggest Trading Mistakes</div>
+      ${mistakeHTML}
+    </div>` : ""}
+
+    ${topLossProfiles.length ? `<div class="section">
+      <div class="section-title" style="margin-top:8px;font-size:13px;color:#e53935;">Loss Fingerprints (most repeated losing profiles)</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">These are your most repeated exact losing setups — grade, confidence, and missing rules.</div>
+      ${profileCards}
+    </div>` : ""}
+    `;
+  })();
+
   content.innerHTML = `
     <!-- Stats -->
     <div class="stats-row">
@@ -787,6 +896,8 @@ if (trades.length === 0) {
       ${avgQSLoss !== null ? `<div class="bar-group"><div class="bar-label"><span style="color:#e53935;">Losses — avg QS</span><span style="color:#e53935;font-weight:bold;">${avgQSLoss}/10</span></div><div class="bar-track"><div class="bar-fill loss" style="width:${parseFloat(avgQSLoss)*10}%;"></div></div></div>` : ""}
       ${avgQS     !== null ? `<div style="font-size:12px;color:#888;margin-top:6px;">Overall avg: <strong style="color:${qsColor(parseFloat(avgQS))};">${avgQS}/10</strong> across ${scoredTrades.length} rated trades</div>` : ""}
     </div>` : ""}
+
+    ${lossDNAHTML}
 
     <!-- Patterns -->
     ${insights.length ? `
@@ -1042,145 +1153,6 @@ if (trades.length === 0) {
 }
 </script>
 
-<!-- ── AI Chat Widget ── -->
-<button id="chat-fab" onclick="toggleChat()" title="AI Trading Assistant">💬</button>
-<div id="chat-panel">
-  <div style="padding:10px 14px;background:#3a1018;border-bottom:1px solid #5a2a31;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-    <div style="font-size:13px;font-weight:bold;">🤖 AI Assistant</div>
-    <div style="display:flex;gap:2px;align-items:center;">
-      <button id="chat-key-btn" onclick="clearChatKey()" title="Change API key">🔑</button>
-      <button id="chat-close-btn" onclick="toggleChat()">✕</button>
-    </div>
-  </div>
-  <div id="chat-messages"></div>
-  <div id="chat-input-row">
-    <input id="chat-input" type="text" placeholder="Ask about your trades...">
-    <button id="chat-send" onclick="sendChatMsg()">Send</button>
-  </div>
-</div>
-
-<script>
-let _chatOpen = false, _chatHistory = [], _chatMsgId = 0;
-
-function toggleChat() {
-  _chatOpen = !_chatOpen;
-  document.getElementById("chat-panel").classList.toggle("open", _chatOpen);
-  if (_chatOpen) {
-    if (!localStorage.getItem("ai_api_key")) showChatKeyPrompt();
-    else if (_chatHistory.length === 0) initChat();
-    setTimeout(() => document.getElementById("chat-input")?.focus(), 60);
-  }
-}
-
-function clearChatKey() {
-  localStorage.removeItem("ai_api_key");
-  _chatHistory = [];
-  showChatKeyPrompt();
-}
-
-function showChatKeyPrompt() {
-  document.getElementById("chat-messages").innerHTML = `
-    <div style="padding:16px;font-size:13px;color:#ccc;line-height:1.6;">
-      <div style="margin-bottom:10px;"><strong style="color:#4caf50;">Free</strong> — no credit card needed.</div>
-      <div style="margin-bottom:12px;">Get a free key at <strong>aistudio.google.com</strong> → Get API key → Create API key. Paste it below:</div>
-      <input id="api-key-input" type="password" placeholder="AIza..." style="width:100%;padding:8px 10px;border-radius:5px;background:#2b0f14;border:1px solid #8b3a44;color:white;font-size:13px;box-sizing:border-box;outline:none;">
-      <button id="chat-save-btn" onclick="saveChatKey()">Save &amp; Start Chat</button>
-      <div style="margin-top:10px;font-size:11px;color:#666;">Uses Google Gemini Flash — completely free</div>
-    </div>`;
-}
-
-function saveChatKey() {
-  const val = (document.getElementById("api-key-input")?.value || "").trim();
-  if (!val.startsWith("AIza")) { alert("Enter a valid Gemini key (starts with AIza)"); return; }
-  localStorage.setItem("ai_api_key", val);
-  initChat();
-}
-
-let _chatSystem = "";
-
-function initChat() {
-  const t = JSON.parse(localStorage.getItem("trades") || "[]");
-  const wins = t.filter(x=>x.result==="Win").length;
-  const losses = t.filter(x=>x.result==="Loss").length;
-  const wr = t.length ? Math.round(wins/t.length*100) : 0;
-  const pairs = [...new Set(t.slice(-15).map(x=>x.pair).filter(Boolean))].join(", ") || "none";
-  _chatSystem = `You are an AI trading assistant embedded in a personal trading journal.
-
-STRATEGY (iFVG — DodgysDD):
-• Rule #1: BSL or SSL must be swept — no sweep = no trade (C grade, avoidable loss)
-• Reversal: sweep BSL/SSL → IFVG inversion → target DOL (EQH/EQL/ITH/ITL/LRLR)
-• Continuation: retrace 50% EQ → new IFVG inversion → next target
-• Valid entry: inversion closes BEFORE next internal high/low is taken
-• Checklist: BSL/SSL Swept | IFVG Identified | Valid Entry | Clear DOL | Correct P/D | No Chop
-• Grades: A+=all 6 | A=no chop missing | A-=P/D missing | B+=valid missing | B=sweep+target | B-=sweep only | C=no sweep
-
-STATS: ${t.length} trades | ${wr}% WR | ${wins}W ${losses}L | pairs: ${pairs}
-
-Be concise and practical. No financial advice.`;
-  _chatHistory = [];
-  document.getElementById("chat-messages").innerHTML =
-    `<div style="padding:12px;font-size:12px;color:#888;line-height:1.5;">Ask me about your setups, patterns, or the iFVG strategy.</div>`;
-}
-
-async function sendChatMsg() {
-  const key = localStorage.getItem("ai_api_key");
-  if (!key) { showChatKeyPrompt(); return; }
-  if (!_chatSystem) initChat();
-  const input = document.getElementById("chat-input");
-  const text = (input.value || "").trim();
-  if (!text) return;
-  input.value = "";
-  _appendChatMsg("user", text);
-  _chatHistory.push({ role: "user", content: text });
-  const tid = _appendChatMsg("assistant", null, true);
-  try {
-    const geminiHistory = _chatHistory.map(m => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
-    }));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: _chatSystem }] },
-        contents: geminiHistory
-      })
-    });
-    document.getElementById(tid)?.remove();
-    if (!res.ok) {
-      const e = await res.json().catch(()=>({}));
-      _appendChatMsg("assistant", `Error: ${e.error?.message || "API error — check your key."}`);
-      return;
-    }
-    const data = await res.json();
-    const reply = data.candidates[0].content.parts[0].text;
-    _chatHistory.push({ role: "assistant", content: reply });
-    _appendChatMsg("assistant", reply);
-  } catch {
-    document.getElementById(tid)?.remove();
-    _appendChatMsg("assistant", "Connection error — check internet or API key.");
-  }
-}
-
-function _appendChatMsg(role, text, typing=false) {
-  const msgs = document.getElementById("chat-messages");
-  const id = "cm-"+(++_chatMsgId);
-  const isUser = role === "user";
-  const d = document.createElement("div");
-  d.id = id;
-  d.style.cssText = `padding:8px 11px;margin:4px 8px;border-radius:8px;font-size:13px;line-height:1.5;max-width:86%;word-break:break-word;${isUser?"background:#5a2a31;margin-left:auto;":"background:#2b1015;"}`;
-  d.innerHTML = typing
-    ? `<span style="color:#555;">thinking...</span>`
-    : (text||"").replace(/</g,"&lt;").replace(/\n/g,"<br>").replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>");
-  msgs.appendChild(d);
-  msgs.scrollTop = msgs.scrollHeight;
-  return id;
-}
-
-document.addEventListener("keydown", e => {
-  if (e.key==="Enter" && _chatOpen && document.activeElement?.id==="chat-input") sendChatMsg();
-});
-</script>
 
 </body>
 </html>
