@@ -488,105 +488,104 @@ if (trades.length === 0) {
     };
   }).sort((a,b) => b.total - a.total);
 
-  // ── PATTERN ENGINE ──
-  const insights = [];
+  // ── STRUCTURED PATTERN ENGINE ──
+  // Detects win/loss-rate patterns from combinations of structured trade fields.
+  // No word frequency — all signal comes from pair, tradeType, checklist, and confidence.
 
-  // Trading-relevant terms to look for in notes
-  const TRADING_TERMS = new Set([
-    // Psychology / discipline
-    "fomo","revenge","scared","fear","greed","patient","patience","discipline","disciplined",
-    "emotional","hesitated","hesitation","hesitating","confident","confidence","impulsive",
-    "rushed","bored","tired","frustrated","anxious","anxiety","calm","focused","distracted",
-    "overconfident","reckless","random","forced","doubt","doubted","second-guessed",
-    // Entry / exit
-    "entry","exit","entered","exited","target","stop","stoploss","fill","filled","missed",
-    "late","early","chased","chasing","oversize","oversized","size","position","risk",
-    "reward","rr","ratio","drawdown","profit","loss",
-    // Direction / bias
-    "long","short","bullish","bearish","bias","direction","reversal","continuation",
-    // Price action
-    "breakout","breakdown","bounce","rejection","rejected","momentum","pullback","retest",
-    "retested","consolidation","ranging","range","trend","trending","support","resistance",
-    "level","zone","structure","candle","wick","body","setup","signal","confluence",
-    "pattern","highs","lows","high","low",
-    // Market conditions
-    "news","choppy","chop","volatile","volatility","liquidity","spread","session","volume",
-    "gap","slow","fast","trap","trapped","fake","fakeout",
-    // iFVG / DodgysDD strategy terms
-    "ifvg","bsl","ssl","dol","reversal","continuation","equilibrium","inversion","inverted",
-    "eqh","eql","reqh","reql","ith","itl","lrlr","htf","ltf","bpr","displacement",
-    "buyside","sellside","drawon","internal","external","sweep","swept","delivery",
-    // Order flow / SMC terms
-    "imbalance","rebalance","mitigation","mitigated","orderblock","liquidity",
-    "inducement","bos","choch","mss","fvg","poi","premium","discount",
-    // Actions
-    "held","ran","stopped","triggered","reversed","continued","tapped","broke","broken",
-    "pushed","dumped","squeezed","spiked","wicked"
-  ]);
+  const patternEngine = (() => {
+    const MIN = 3; // minimum trades required to surface a pattern
+    const CLL = {
+      sweep: "BSL/SSL Swept", ifvg: "IFVG Identified", valid: "Valid Entry",
+      target: "Clear DOL", pd: "Correct P/D", momentum: "No Chop"
+    };
 
-  // Generic English words to always ignore (even if repeated)
-  const STOP = new Set([
-    "the","and","to","it","in","of","my","was","on","at","had","but","is","so","for",
-    "with","not","this","that","then","just","got","out","up","be","did","no","too",
-    "into","from","after","also","an","as","are","have","its","me","we","they","all",
-    "or","if","by","i","a","you","he","she","we","our","your","his","her","their",
-    "want","wanted","like","liked","how","far","kept","keep","came","come","went","go",
-    "take","took","make","made","said","say","know","knew","think","thought","see","saw",
-    "felt","feel","would","could","should","will","can","may","might","must","need",
-    "been","being","get","very","really","quite","still","again","even","already","almost",
-    "always","never","often","sometimes","finally","actually","basically","however",
-    "therefore","pretty","about","around","before","during","through","between","over",
-    "under","back","right","left","other","more","less","much","many","few","some","any",
-    "every","each","both","time","day","week","month","year","thing","way","part","here",
-    "there","where","when","why","what","which","who","same","different","new","old",
-    "big","good","bad","well","now","then","set","end","put","try","tried","used","use",
-    "move","moved","look","looked","let","its","these","those","than","only","such",
-    "own","while","where","because","since","unless","until","although","whether",
-    "nor","yet","either","neither","once","further","down","off","next","last","first",
-    "second","third","price","prices","higher","lower","little","didnt","wasnt","couldnt",
-    "shouldnt","wouldnt","expanded","instead","thought","thinking","going","doing",
-    "something","anything","nothing","everything","another","without","within","across"
-  ]);
+    function wr(set)  { return Math.round(set.filter(t => t.result === "Win").length  / set.length * 100); }
+    function lr(set)  { return Math.round(set.filter(t => t.result === "Loss").length / set.length * 100); }
 
-  function tokenize(text) {
-    return text.toLowerCase()
-      .replace(/[^a-z\s]/g, " ")
-      .split(/\s+/)
-      .filter(w => w.length > 2 && !STOP.has(w));
-  }
+    // Build a pattern record. Returns null if set is below MIN trades.
+    function detect(label, set, vsSet) {
+      if (set.length < MIN) return null;
+      const wins     = set.filter(t => t.result === "Win").length;
+      const losses   = set.filter(t => t.result === "Loss").length;
+      const winRate  = wr(set);
+      const lossRate = lr(set);
+      const vsWR = (vsSet && vsSet.length >= 2)
+        ? Math.round(vsSet.filter(t => t.result === "Win").length / vsSet.length * 100)
+        : null;
+      const type = winRate >= 65 ? "good" : lossRate >= 60 ? "warning" : "info";
+      return { label, count: set.length, wins, losses, wr: winRate, lr: lossRate, vsWR, type };
+    }
 
-  // Count each word once per trade (presence, not raw frequency)
-  function wordPresence(tradeSet) {
-    const presence = {};
-    tradeSet.forEach(t => {
-      const words = new Set(tokenize(t.notes || ""));
-      words.forEach(w => { presence[w] = (presence[w]||0)+1; });
+    const found = [];
+    const push  = p => { if (p) found.push(p); };
+
+    const allPairs = [...new Set(trades.map(t => t.pair))];
+    const withCL   = trades.filter(t => t.checklist);
+    const withConf = trades.filter(t => t.confidence);
+
+    // 1. By trade type
+    ["Reversal", "Continuation"].forEach(type => {
+      const sub   = trades.filter(t => t.tradeType === type);
+      const other = trades.filter(t => t.tradeType && t.tradeType !== type);
+      push(detect(`${type} trades`, sub, other));
     });
-    return presence;
-  }
 
-  // Words significantly more common in one group vs the other
-  // minBias: minimum percentage-point gap to show a word (default 20pp)
-  function biasedWords(srcPresence, othPresence, srcN, othN, minBias = 20) {
-    if (srcN === 0) return [];
-    return Object.entries(srcPresence)
-      .filter(([w, cnt]) => {
-        if (cnt < 2) return false;
-        if (!TRADING_TERMS.has(w) && cnt < 3) return false;
-        const srcPct = (cnt / srcN) * 100;
-        const othPct = ((othPresence[w]||0) / (othN || 1)) * 100;
-        return srcPct - othPct >= minBias;
-      })
-      .map(([w, cnt]) => ({
-        word: w,
-        srcCount: cnt,
-        srcPct: Math.round((cnt / srcN) * 100),
-        othPct: Math.round(((othPresence[w]||0) / (othN || 1)) * 100),
-        bias: Math.round((cnt / srcN) * 100 - ((othPresence[w]||0) / (othN || 1)) * 100)
-      }))
-      .sort((a, b) => b.bias - a.bias)
-      .slice(0, 8);
-  }
+    // 2. By pair × type combo
+    allPairs.forEach(pair => {
+      ["Reversal", "Continuation"].forEach(type => {
+        const sub = trades.filter(t => t.pair === pair && t.tradeType === type);
+        push(detect(`${pair} ${type}`, sub));
+      });
+    });
+
+    // 3. By confidence band
+    [
+      { label: "High confidence (≥8/10)", filter: t => t.confidence >= 8, vs: t => t.confidence < 8 },
+      { label: "Low confidence (≤5/10)",  filter: t => t.confidence <= 5, vs: t => t.confidence > 5 },
+    ].forEach(({ label, filter, vs }) => {
+      push(detect(label, withConf.filter(filter), withConf.filter(vs)));
+    });
+
+    // 4. By type + confidence band
+    ["Reversal", "Continuation"].forEach(type => {
+      const typed = trades.filter(t => t.tradeType === type && t.confidence);
+      [
+        { label: `${type} + confidence ≥7`, filter: t => t.confidence >= 7 },
+        { label: `${type} + confidence ≤5`, filter: t => t.confidence <= 5 },
+      ].forEach(({ label, filter }) => {
+        push(detect(label, typed.filter(filter), typed.filter(t => !filter(t))));
+      });
+    });
+
+    // 5. Per checklist condition — only surface if WR gap vs absent is ≥20pp
+    ["sweep", "ifvg", "valid", "target", "pd", "momentum"].forEach(k => {
+      const present = withCL.filter(t =>  t.checklist[k]);
+      const absent  = withCL.filter(t => !t.checklist[k]);
+      const p = detect(`With "${CLL[k]}"`, present, absent);
+      if (!p) return;
+      const absentWR = absent.length >= 2
+        ? Math.round(absent.filter(t => t.result === "Win").length / absent.length * 100)
+        : null;
+      if (absentWR !== null && Math.abs(p.wr - absentWR) >= 20) push(p);
+    });
+
+    // 6. Trades without sweep specifically
+    push(detect("Without sweep", withCL.filter(t => !t.checklist.sweep)));
+
+    // 7. Grade tiers
+    const aPlus   = trades.filter(t => t.grade && (t.grade === "A+" || t.grade === "A"));
+    const bcGrade = trades.filter(t => t.grade && ["B", "B-", "C"].includes(t.grade));
+    push(detect("A/A+ grade setups", aPlus, bcGrade));
+    push(detect("B/C grade setups",  bcGrade, aPlus));
+
+    // De-duplicate, then rank by extremity from 50% WR, then sample size
+    const seen = new Set();
+    return found
+      .filter(p => { if (seen.has(p.label)) return false; seen.add(p.label); return true; })
+      .sort((a, b) => Math.abs(b.wr - 50) - Math.abs(a.wr - 50) || b.count - a.count);
+  })();
+
+  const insights = [];
 
   // 1. Pair loss rate
   const worstPair = [...pairStats].sort((a,b) => b.losses - a.losses)[0];
@@ -990,6 +989,219 @@ if (trades.length === 0) {
       ${profileCards}
     </div>` : ""}
     `;
+  })();
+
+  // ── PLAYBOOK: best setup detection ──
+  const playbookHTML = (() => {
+    if (trades.length < 3) return "";
+
+    // Score each unique combo: pair × tradeType × checklist conditions
+    const comboMap = {};
+    trades.forEach(t => {
+      const pair = t.pair || "–";
+      const type = t.tradeType || "Any";
+      const cl   = t.checklist || {};
+      const condKey = ["sweep","ifvg","valid","target","pd","momentum"]
+        .filter(k => cl[k]).join("+") || "none";
+      const key = `${pair}|${type}|${condKey}`;
+      if (!comboMap[key]) comboMap[key] = { pair, type, conditions: condKey, wins:0, losses:0, total:0 };
+      comboMap[key].total++;
+      if (t.result === "Win")  comboMap[key].wins++;
+      if (t.result === "Loss") comboMap[key].losses++;
+    });
+
+    // Filter: min 2 trades, rank by win rate then sample size
+    const candidates = Object.values(comboMap)
+      .filter(c => c.total >= 2)
+      .map(c => ({ ...c, wr: Math.round(c.wins / c.total * 100) }))
+      .sort((a,b) => b.wr - a.wr || b.total - a.total);
+
+    if (!candidates.length) return "";
+    const best = candidates[0];
+
+    // Checklist alignment score for best setup
+    const condLabels = {
+      sweep:"BSL/SSL Swept", ifvg:"IFVG Identified", valid:"Valid Entry",
+      target:"Clear DOL", pd:"Correct P/D", momentum:"No Chop"
+    };
+    const condList = best.conditions === "none" ? []
+      : best.conditions.split("+").map(k => condLabels[k] || k);
+
+    const wrColor = best.wr >= 70 ? "#4caf50" : best.wr >= 50 ? "#ffa726" : "#e53935";
+
+    // Runner-up setups (top 3 excluding #1)
+    const runners = candidates.slice(1, 4);
+    const runnerRows = runners.map(r => {
+      const c = r.wr >= 70 ? "#4caf50" : r.wr >= 50 ? "#ffa726" : "#e53935";
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2b0f14;">
+        <span style="font-size:13px;color:#ccc;">${r.pair} &nbsp;·&nbsp; ${r.type} &nbsp;·&nbsp; ${r.conditions === "none" ? "No checklist" : r.conditions.split("+").length + " conditions"}</span>
+        <span style="font-weight:bold;color:${c};">${r.wr}% <span style="font-size:11px;color:#666;">(${r.total})</span></span>
+      </div>`;
+    }).join("");
+
+    return `
+    <hr class="divider">
+    <div class="section-title" style="margin-top:0;color:#f5c842;">📖 Your Playbook</div>
+    <div style="max-width:700px;margin:0 auto;padding:0 16px;">
+
+      <!-- Best setup card -->
+      <div style="background:#0d2a1a;border:2px solid #4caf50;border-radius:12px;padding:20px 24px;margin-bottom:20px;text-align:left;">
+        <div style="font-size:11px;color:#4caf50;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:bold;">Best Setup — Stack the deck with this</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
+            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Pair</div>
+            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.pair}</div>
+          </div>
+          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
+            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Type</div>
+            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.type}</div>
+          </div>
+          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
+            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Win Rate</div>
+            <div style="font-size:20px;font-weight:bold;color:${wrColor};">${best.wr}%</div>
+          </div>
+          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
+            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Sample</div>
+            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.wins}W / ${best.losses}L</div>
+          </div>
+        </div>
+        ${condList.length ? `
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Conditions required</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${condList.map(c => `<span style="background:#1b4d1e;color:#81c784;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;">✓ ${c}</span>`).join("")}
+        </div>` : ""}
+      </div>
+
+      ${runners.length ? `
+      <div style="background:#1e0d10;border-radius:10px;padding:14px 18px;text-align:left;">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Other Strong Setups</div>
+        ${runnerRows}
+      </div>` : ""}
+    </div>`;
+  })();
+
+  // ── WHEN NOT TO TRADE: data-driven rules ──
+  const noTradeHTML = (() => {
+    if (trades.length < 4) return "";
+    const rules = [];
+
+    // 1. Low confidence loss rate
+    const confTrades2 = trades.filter(t => t.confidence);
+    if (confTrades2.length >= 3) {
+      [4, 5].forEach(thresh => {
+        const low = confTrades2.filter(t => t.confidence <= thresh);
+        if (low.length >= 2) {
+          const lossRate = Math.round(low.filter(t => t.result === "Loss").length / low.length * 100);
+          if (lossRate >= 55) {
+            rules.push({
+              text: `Trades with confidence <strong>≤ ${thresh}/10</strong> have a <strong style="color:#e53935;">${lossRate}% loss rate</strong> (${low.length} trades).`,
+              rule: `Skip any trade where your conviction is ${thresh}/10 or below.`,
+              severity: lossRate >= 70 ? "high" : "med"
+            });
+            return; // only show the strongest threshold
+          }
+        }
+      });
+    }
+
+    // 2. No sweep loss rate
+    const withCL2 = trades.filter(t => t.checklist);
+    if (withCL2.length >= 3) {
+      const noSweep = withCL2.filter(t => !t.checklist.sweep);
+      if (noSweep.length >= 2) {
+        const lr = Math.round(noSweep.filter(t => t.result === "Loss").length / noSweep.length * 100);
+        if (lr >= 50) rules.push({
+          text: `Trades taken <strong>without a BSL/SSL sweep</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${noSweep.length} trades).`,
+          rule: `No sweep = no trade. Non-negotiable.`,
+          severity: lr >= 70 ? "high" : "med"
+        });
+      }
+
+      // 3. No IFVG loss rate
+      const noIFVG = withCL2.filter(t => t.checklist.sweep && !t.checklist.ifvg);
+      if (noIFVG.length >= 2) {
+        const lr = Math.round(noIFVG.filter(t => t.result === "Loss").length / noIFVG.length * 100);
+        if (lr >= 55) rules.push({
+          text: `Trades with sweep but <strong>no IFVG</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${noIFVG.length} trades).`,
+          rule: `If you can't identify a clear IFVG, wait for one or skip the trade.`,
+          severity: lr >= 70 ? "high" : "med"
+        });
+      }
+
+      // 4. Invalid entry (no valid even with sweep+IFVG)
+      const noValid = withCL2.filter(t => t.checklist.sweep && t.checklist.ifvg && !t.checklist.valid);
+      if (noValid.length >= 2) {
+        const lr = Math.round(noValid.filter(t => t.result === "Loss").length / noValid.length * 100);
+        if (lr >= 55) rules.push({
+          text: `Trades with sweep + IFVG but <strong>invalid entry</strong> lose <strong style="color:#e53935;">${lr}%</strong> (${noValid.length} trades).`,
+          rule: `Wait for inversion before the next internal level — if entry isn't valid, pass.`,
+          severity: lr >= 70 ? "high" : "med"
+        });
+      }
+    }
+
+    // 5. B/C grade loss rate
+    const lowGrade = trades.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
+    if (lowGrade.length >= 2) {
+      const lr = Math.round(lowGrade.filter(t => t.result === "Loss").length / lowGrade.length * 100);
+      if (lr >= 55) rules.push({
+        text: `<strong>B/C grade setups</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${lowGrade.length} trades).`,
+        rule: `Minimum grade = B+. Below that, sit on your hands.`,
+        severity: lr >= 70 ? "high" : "med"
+      });
+    }
+
+    // 6. Loss after a loss (next trade after a loss)
+    let afterLossTotal = 0, afterLossLosses = 0;
+    for (let i = 1; i < trades.length; i++) {
+      if (trades[i-1].result === "Loss") {
+        afterLossTotal++;
+        if (trades[i].result === "Loss") afterLossLosses++;
+      }
+    }
+    if (afterLossTotal >= 3) {
+      const lr = Math.round(afterLossLosses / afterLossTotal * 100);
+      if (lr >= 55) rules.push({
+        text: `Your trade <strong>immediately after a loss</strong> loses <strong style="color:#e53935;">${lr}%</strong> of the time (${afterLossTotal} instances).`,
+        rule: `After a loss: step away for at least 30 minutes before considering another entry.`,
+        severity: lr >= 70 ? "high" : "med"
+      });
+    }
+
+    // 7. Pair-specific if a pair loses way more than average
+    pairStats.forEach(p => {
+      if (p.total < 3) return;
+      const pLR = Math.round(p.losses / p.total * 100);
+      const overall = Math.round(losses.length / total * 100);
+      if (pLR >= 60 && pLR >= overall + 20) {
+        rules.push({
+          text: `<strong>${p.pair}</strong> has a <strong style="color:#e53935;">${pLR}% loss rate</strong> — ${pLR - overall}% worse than your overall average.`,
+          rule: `Consider reducing size on ${p.pair} until you understand what's going wrong.`,
+          severity: pLR >= 75 ? "high" : "med"
+        });
+      }
+    });
+
+    if (!rules.length) return "";
+
+    const ruleCards = rules.map(r => {
+      const borderColor = r.severity === "high" ? "#e53935" : "#ffa726";
+      const badge = r.severity === "high"
+        ? `<span style="background:#e53935;color:#fff;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;margin-left:8px;">HIGH RISK</span>`
+        : `<span style="background:#5a3500;color:#ffa726;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;margin-left:8px;">AVOID</span>`;
+      return `<div style="background:#1e0d10;border-left:3px solid ${borderColor};border-radius:8px;padding:14px 16px;margin-bottom:10px;text-align:left;">
+        <div style="font-size:14px;line-height:1.6;margin-bottom:8px;">${r.text} ${badge}</div>
+        <div style="font-size:12px;color:#ffa726;font-weight:bold;">→ ${r.rule}</div>
+      </div>`;
+    }).join("");
+
+    return `
+    <hr class="divider">
+    <div class="section-title" style="margin-top:0;color:#e53935;">🚫 When NOT to Trade</div>
+    <div style="font-size:12px;color:#888;text-align:center;margin:-8px 0 16px;">Generated from your actual trade data. These are real patterns, not generic advice.</div>
+    <div style="max-width:700px;margin:0 auto;padding:0 16px;">
+      ${ruleCards}
+    </div>`;
   })();
 
   content.innerHTML = `
