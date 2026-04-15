@@ -457,6 +457,7 @@ function openLightbox(src) {
 if (trades.length === 0) {
   content.innerHTML = `<p class="empty">No trades logged yet. Add some in the Journal first.</p>`;
 } else {
+try {
   const wins   = trades.filter(t => t.result === "Win");
   const losses = trades.filter(t => t.result === "Loss");
   const bes    = trades.filter(t => t.result === "BE");
@@ -585,6 +586,56 @@ if (trades.length === 0) {
       .sort((a, b) => Math.abs(b.wr - 50) - Math.abs(a.wr - 50) || b.count - a.count);
   })();
 
+  // ── WORD FREQUENCY ANALYSIS ──
+  // Restored: wordPresence + biasedWords used for journal note pattern detection.
+  const STOP = new Set([
+    "the","a","an","and","or","but","in","on","at","to","for","of","with","it","is","was",
+    "were","be","been","being","have","has","had","do","does","did","will","would","could",
+    "should","may","might","shall","can","this","that","these","those","i","my","me","we",
+    "our","you","your","he","his","she","her","they","their","them","its","what","which",
+    "who","there","here","when","where","why","how","all","each","every","no","not","so",
+    "than","very","just","also","about","up","out","as","if","then","into","from","after",
+    "before","while","though","because","since","still","even","such","off","over","only",
+    "both","through","without","back","right","more","most","other","now","too","already",
+    "get","got","went","came","made","said","want","like","know","see","think","take","put",
+    "set","go","try","let","use","find","feel","keep","show","stop","give","look","turn",
+    "start","hear","run","work","call","seem","happen","come","went","become","really","did",
+    "was","had","but","one","two","three","day","time","way","lot","bit","well","good","bad"
+  ]);
+
+  function wordPresence(tradeSet) {
+    const freq = {};
+    tradeSet.forEach(t => {
+      const text = (t.notes || "").toLowerCase();
+      const words = text.match(/\b[a-z']{3,}\b/g) || [];
+      words.forEach(w => {
+        if (!STOP.has(w)) freq[w] = (freq[w] || 0) + 1;
+      });
+    });
+    return freq;
+  }
+
+  function biasedWords(main, other, mainTotal, otherTotal, minBias) {
+    if (minBias === undefined) minBias = 20;
+    if (!mainTotal) return [];
+    const results = [];
+    Object.keys(main).forEach(function(word) {
+      const mainRate  = (main[word]  / mainTotal)  * 100;
+      const otherRate = (other[word] && otherTotal) ? (other[word] / otherTotal) * 100 : 0;
+      const bias = mainRate - otherRate;
+      if (bias >= minBias && main[word] >= 2) {
+        results.push({ word: word, count: main[word], bias: Math.round(bias) });
+      }
+    });
+    return results.sort(function(a, b) { return b.bias - a.bias; });
+  }
+
+  // Compute presence maps and biased word lists for wins vs losses
+  const lossPresence = wordPresence(losses);
+  const winPresence  = wordPresence(wins);
+  const lossWords = biasedWords(lossPresence, winPresence, losses.length || 1, wins.length || 1);
+  const winWords  = biasedWords(winPresence, lossPresence, wins.length || 1, losses.length || 1);
+
   const insights = [];
 
   // 1. Pair loss rate
@@ -632,27 +683,21 @@ if (trades.length === 0) {
   }
   if (revengeCnt >= 2) insights.push({ level:"warning", text: `Possible <strong>revenge trading</strong> detected — you've taken back-to-back losses on the same pair <strong>${revengeCnt} times</strong>. After a loss, pause before re-entering.` });
 
-  // 6. Word presence analysis — per-trade, not per-mention
-  const lossPresence = wordPresence(losses);
-  const winPresence  = wordPresence(wins);
-  const lossWords    = biasedWords(lossPresence, winPresence, losses.length, wins.length);
-  const winWords     = biasedWords(winPresence,  lossPresence, wins.length, losses.length);
-
-  // Surface top loss-biased words as a pattern insight
-  if (lossWords.length >= 2) {
-    const top = lossWords.slice(0, 5).map(w => `<strong>${w.word}</strong>`).join(", ");
-    insights.push({ level:"warning", text: `Red-flag thoughts in your losses: ${top}. If any of these come up before entry, sit on your hands.` });
-  }
-
-  // 7. Win-biased words
-  if (winWords.length >= 2) {
-    const top = winWords.slice(0, 4).map(w => `<strong>${w.word}</strong>`).join(", ");
-    insights.push({ level:"good", text: `Winning mindset words: ${top}. When you're thinking like this, your trades tend to work.` });
-  }
-
-  // Keep lossFreq/winFreq aliases for legacy HTML section below
-  const lossFreq = lossPresence;
-  const winFreq  = winPresence;
+  // 6. Structured pattern insights — surface best and worst setup combinations
+  patternEngine
+    .filter(p => p.type === "good" && p.wr >= 65)
+    .slice(0, 3)
+    .forEach(p => {
+      const vs = p.vsWR !== null ? ` vs ${p.vsWR}% for other setups.` : ".";
+      insights.push({ level: "good", text: `<strong>${p.label}</strong>: <strong>${p.wr}%</strong> win rate (${p.wins}W / ${p.losses}L over ${p.count} trades)${vs}` });
+    });
+  patternEngine
+    .filter(p => p.type === "warning" && p.lr >= 60)
+    .slice(0, 3)
+    .forEach(p => {
+      const vs = p.vsWR !== null ? ` Other setups win ${p.vsWR}% of the time.` : "";
+      insights.push({ level: "warning", text: `<strong>${p.label}</strong>: <strong>${p.lr}%</strong> loss rate across ${p.count} trades.${vs}` });
+    });
 
   // 8. Win rate trend (first half vs second half)
   if (total >= 6) {
@@ -1204,6 +1249,46 @@ if (trades.length === 0) {
     </div>`;
   })();
 
+  // ── PATTERN INSIGHTS HTML ──
+  const patternInsightsHTML = (() => {
+    const good    = patternEngine.filter(p => p.type === "good");
+    const warning = patternEngine.filter(p => p.type === "warning");
+    if (!good.length && !warning.length) return "";
+
+    function card(p, color) {
+      const vsLine = p.vsWR !== null
+        ? ` <span style="font-size:11px;color:#888;">vs ${p.vsWR}% other</span>`
+        : "";
+      return `<div class="bar-group">
+        <div class="bar-label">
+          <span style="font-weight:bold;">${p.label}</span>
+          <span style="font-size:11px;color:#aaa;">${p.wins}W / ${p.losses}L &nbsp;·&nbsp; ${p.count} trades</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${p.wr}%;background:${color};"></div></div>
+        <div style="font-size:11px;margin-top:2px;"><strong style="color:${color};">${p.wr}% WR</strong>${vsLine}</div>
+      </div>`;
+    }
+
+    return `
+    <div class="section" style="max-width:760px;">
+      <div class="section-title" style="margin-top:8px;">Pattern Insights <span style="font-size:10px;color:#666;">(min 3 trades · pair × type × checklist × confidence)</span></div>
+      <div class="word-cols">
+        ${good.length ? `
+        <div class="word-col">
+          <div class="word-col-title" style="color:#4caf50;">Strong Setup Patterns</div>
+          <div style="font-size:11px;color:#888;margin-bottom:10px;">Combinations with high win rates from your actual trade history.</div>
+          ${good.slice(0, 6).map(p => card(p, "#4caf50")).join("")}
+        </div>` : ""}
+        ${warning.length ? `
+        <div class="word-col">
+          <div class="word-col-title" style="color:#e53935;">Weak Setup Patterns</div>
+          <div style="font-size:11px;color:#888;margin-bottom:10px;">These combinations keep losing — identify what's different and cut them.</div>
+          ${warning.slice(0, 6).map(p => card(p, "#e53935")).join("")}
+        </div>` : ""}
+      </div>
+    </div>`;
+  })();
+
   content.innerHTML = `
     <!-- Stats -->
     <div class="stats-row">
@@ -1273,6 +1358,10 @@ if (trades.length === 0) {
 
     ${lossDNAHTML}
 
+    ${playbookHTML}
+
+    ${noTradeHTML}
+
     <!-- Patterns -->
     ${insights.length ? `
     <div class="section">
@@ -1284,37 +1373,32 @@ if (trades.length === 0) {
       }).join("")}
     </div>` : ""}
 
-    <!-- Journal thought analysis -->
-    ${(lossWords.length > 0 || winWords.length > 0) ? (() => {
-      function thoughtRow(w, barColor) {
-        return `<div class="bar-group">
-          <div class="bar-label">
-            <span style="font-weight:bold;">${w.word}</span>
-            <span style="font-size:11px;color:#aaa;">${w.srcCount} trade${w.srcCount>1?"s":""} (${w.srcPct}%) &nbsp;vs&nbsp; ${w.othPct}% other</span>
-          </div>
-          <div class="bar-track"><div class="bar-fill" style="width:${w.srcPct}%;background:${barColor};"></div></div>
-        </div>`;
-      }
+    <!-- Pattern Insights -->
+    ${patternInsightsHTML}
 
-      return `
-      <div class="section" style="max-width:760px;">
-        <div class="section-title" style="margin-top:8px;">Journal Thought Analysis <span style="font-size:10px;color:#666;">(% of trades containing each word — once per trade)</span></div>
-        <div class="word-cols">
-          ${lossWords.length ? `
-          <div class="word-col">
-            <div class="word-col-title" style="color:#e53935;">Red Flag Thoughts</div>
-            <div style="font-size:11px;color:#888;margin-bottom:10px;">These appear significantly more in your losses. If you're writing like this, reconsider the trade.</div>
-            ${lossWords.map(w => thoughtRow(w, "#e53935")).join("")}
-          </div>` : ""}
-          ${winWords.length ? `
-          <div class="word-col">
-            <div class="word-col-title" style="color:#4caf50;">Winning Thoughts</div>
-            <div style="font-size:11px;color:#888;margin-bottom:10px;">These appear significantly more in your wins. Look for this mindset before entering.</div>
-            ${winWords.map(w => thoughtRow(w, "#4caf50")).join("")}
-          </div>` : ""}
-        </div>
-      </div>`;
-    })() : ""}
+    <!-- Word Analysis (journal note frequency) -->
+    ${(lossWords.length > 0 || winWords.length > 0) ? `
+    <div class="section" style="max-width:760px;">
+      <div class="section-title" style="margin-top:8px;">Journal Word Analysis <span style="font-size:10px;color:#666;">(words that appear more in losses vs wins)</span></div>
+      <div class="word-cols">
+        ${lossWords.length ? `<div class="word-col">
+          <div class="word-col-title" style="color:#e53935;">Loss-Correlated Words</div>
+          <div style="font-size:11px;color:#888;margin-bottom:10px;">These words appear more in your losing trade notes than your winning ones.</div>
+          ${lossWords.slice(0,12).map(w => `<div class="bar-group">
+            <div class="bar-label"><span>${w.word}</span><span style="font-size:11px;color:#aaa;">${w.count}x &nbsp;·&nbsp; +${w.bias}% vs wins</span></div>
+            <div class="bar-track"><div class="bar-fill loss" style="width:${Math.min(w.bias*2,100)}%;"></div></div>
+          </div>`).join("")}
+        </div>` : ""}
+        ${winWords.length ? `<div class="word-col">
+          <div class="word-col-title" style="color:#4caf50;">Win-Correlated Words</div>
+          <div style="font-size:11px;color:#888;margin-bottom:10px;">These words appear more in your winning trade notes than your losing ones.</div>
+          ${winWords.slice(0,12).map(w => `<div class="bar-group">
+            <div class="bar-label"><span>${w.word}</span><span style="font-size:11px;color:#aaa;">${w.count}x &nbsp;·&nbsp; +${w.bias}% vs losses</span></div>
+            <div class="bar-track"><div class="bar-fill win" style="width:${Math.min(w.bias*2,100)}%;"></div></div>
+          </div>`).join("")}
+        </div>` : ""}
+      </div>
+    </div>` : ""}
 
     <hr class="divider">
 
@@ -1608,6 +1692,9 @@ if (trades.length === 0) {
     document.getElementById("detail-panel").classList.remove("open");
     document.getElementById("detail-overlay").classList.remove("open");
   }
+} catch(e) {
+  content.innerHTML = `<div style="padding:40px;color:#e53935;font-family:monospace;font-size:13px;text-align:left;max-width:800px;margin:0 auto;"><strong>JavaScript Error — please report this:</strong><br><br>${e.message}<br><br><pre style="white-space:pre-wrap;font-size:11px;color:#aaa;background:#1a0a0c;padding:12px;border-radius:6px;">${e.stack}</pre><div style="margin-top:16px;font-size:12px;color:#888;">Open DevTools (F12 → Console) for full details.</div></div>`;
+}
 }
 </script>
 
