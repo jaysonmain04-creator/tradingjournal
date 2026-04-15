@@ -704,6 +704,11 @@
     <div class="note-doc">
 
       <div class="note-q">
+        <span class="note-q-label">Why did you enter this trade?</span>
+        <textarea id="nq-reason" rows="3" oninput="autoResize(this)" placeholder="What was your reason for taking this trade? Setup, bias, conviction..."></textarea>
+      </div>
+
+      <div class="note-q">
         <span class="note-q-label">Was the trade aligned with your analysis?</span>
         <textarea id="nq-analysis" rows="2" oninput="autoResize(this)"></textarea>
       </div>
@@ -796,6 +801,7 @@
 
   function openNotePanel() {
     // Restore answers
+    document.getElementById("nq-reason").value    = pendingNoteData.reason;
     document.getElementById("nq-analysis").value  = pendingNoteData.analysis;
     document.getElementById("nq-rules").value      = pendingNoteData.rules;
     document.getElementById("nq-mindset").value    = pendingNoteData.mindset;
@@ -813,14 +819,15 @@
       confTouched = false;
     }
     // Auto-resize textareas
-    ["nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => autoResize(document.getElementById(id)));
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => autoResize(document.getElementById(id)));
 
     document.getElementById("note-panel").classList.add("open");
     document.getElementById("note-overlay").classList.add("open");
-    setTimeout(() => document.getElementById("nq-analysis").focus(), 280);
+    setTimeout(() => document.getElementById("nq-reason").focus(), 280);
   }
 
   function closeNotePanel() {
+    pendingNoteData.reason   = document.getElementById("nq-reason").value.trim();
     pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
     pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
     pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
@@ -828,6 +835,7 @@
 
     // Build combined note string
     const parts = [];
+    if (pendingNoteData.reason)   parts.push("Why I entered: "         + pendingNoteData.reason);
     if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
     if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
     if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
@@ -843,7 +851,7 @@
     updateNoteTrigger();
   }
 
-  const pendingNoteData = { analysis: "", rules: "", mindset: "", feeling: "" };
+  const pendingNoteData = { reason: "", analysis: "", rules: "", mindset: "", feeling: "" };
 
   function updateNoteTrigger() {
     const trigger  = document.getElementById("note-trigger");
@@ -875,7 +883,7 @@
     pendingConfidence = null;
     pendingYN = null;
     confTouched = false;
-    pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
     updateNoteTrigger();
   }
 
@@ -1085,6 +1093,7 @@
 
     const formatNotes = (raw) => {
       const labelMap = [
+        { key: "Why I entered",         display: "Why did you enter this trade?" },
         { key: "Aligned with analysis", display: "Was the trade aligned with analysis?" },
         { key: "Rules followed",        display: "Were your rules followed?" },
         { key: "Mindset",               display: "What was your mindset coming into the market?" },
@@ -1186,13 +1195,13 @@
     document.getElementById("preview").style.display = "none";
     document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
     // Reset note panel fields
-    ["nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
     document.getElementById("nq-confidence").value = 5;
     document.getElementById("conf-value-display").textContent = "—";
     document.getElementById("conf-value-label").textContent  = "—";
     document.getElementById("yn-yes").classList.remove("active");
     document.getElementById("yn-no").classList.remove("active");
-    pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
     pendingImage = null;
     pendingNote  = "";
     pendingConfidence = null;
