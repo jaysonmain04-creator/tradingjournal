@@ -410,8 +410,9 @@
 <body>
 
 <nav>
-  <a href="index.html" style="opacity:0.4;">Journal</a>
+  <a href="trading-journal.html" style="opacity:0.4;">Journal</a>
   <a href="analysis.html">Analysis</a>
+  <a href="replay.html" style="opacity:0.4;">Replay</a>
 </nav>
 
 <h1>Analysis</h1>
@@ -1713,6 +1714,508 @@ try {
 }
 </script>
 
+<script>
+// ════════════════════════════════════════════════════════════════
+//  ANALYTICS ENGINE  (Features 1–5 + Enhancements)
+//  All functions are pure JS, no external deps.
+// ════════════════════════════════════════════════════════════════
+
+// ── RR parser (shared by all modules) ───────────────────────────
+function parseRR(rr) {
+  if (rr === null || rr === undefined) return null;
+  const s = String(rr).trim();
+  if (!s) return null;
+  const ci = s.indexOf(":");
+  if (ci !== -1) {
+    const risk = parseFloat(s.slice(0, ci)), reward = parseFloat(s.slice(ci + 1));
+    if (isNaN(risk) || isNaN(reward) || risk === 0) return null;
+    return reward / risk;
+  }
+  const v = parseFloat(s);
+  return isNaN(v) ? null : v;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 1 — Pattern Statistics Engine
+// ════════════════════════════════════════════════════════════════
+function generatePatternStats(trades) {
+  if (!Array.isArray(trades) || trades.length === 0) return [];
+
+  function buildStats(label, subset, category) {
+    if (subset.length < 3) return null;
+    const wins   = subset.filter(t => t.result === "Win").length;
+    const losses = subset.filter(t => t.result === "Loss").length;
+    const bes    = subset.filter(t => t.result === "BE").length;
+    return { label, total: subset.length, wins, losses, bes,
+             winRate: Math.round((wins / subset.length) * 100), category };
+  }
+
+  function confBucket(c) {
+    if (c <= 4) return "Confidence ≤4";
+    if (c <= 6) return "Confidence 5–6";
+    if (c <= 8) return "Confidence 7–8";
+    return "Confidence 9–10";
+  }
+
+  const results = [];
+  const push = p => { if (p) results.push(p); };
+
+  [...new Set(trades.map(t => t.pair).filter(Boolean))].forEach(p =>
+    push(buildStats(`${p} trades`, trades.filter(t => t.pair === p), "pair")));
+
+  [...new Set(trades.map(t => t.tradeType).filter(Boolean))].forEach(tt =>
+    push(buildStats(`${tt} trades`, trades.filter(t => t.tradeType === tt), "tradeType")));
+
+  [...new Set(trades.map(t => t.grade).filter(Boolean))].forEach(g =>
+    push(buildStats(`Grade ${g}`, trades.filter(t => t.grade === g), "grade")));
+
+  ["Confidence ≤4","Confidence 5–6","Confidence 7–8","Confidence 9–10"].forEach(b =>
+    push(buildStats(b, trades.filter(t => typeof t.confidence === "number" && confBucket(t.confidence) === b), "confidence")));
+
+  ["sweep","ifvg","valid","target","pd","momentum"].forEach(k => {
+    push(buildStats(`${k} present`, trades.filter(t => t.checklist && t.checklist[k] === true), "checklist"));
+    push(buildStats(`${k} absent`,  trades.filter(t => !t.checklist || t.checklist[k] !== true), "checklist"));
+  });
+
+  results.sort((a, b) => b.winRate - a.winRate);
+  return results;
+}
+
+function renderPatternStats(patterns) {
+  if (!Array.isArray(patterns) || patterns.length === 0)
+    return `<div style="color:#888;padding:16px;">No pattern data yet — add more trades.</div>`;
+
+  const barColor = wr => wr >= 65 ? "#22c55e" : wr >= 40 ? "#f97316" : "#ef4444";
+  const catLabels = { pair:"By Instrument", tradeType:"By Trade Type", grade:"By Grade",
+                      confidence:"By Confidence", checklist:"By Checklist Condition" };
+
+  const cats = [...new Set(patterns.map(p => p.category))];
+  let html = `<div style="font-family:sans-serif;background:#1e0d10;padding:20px;border-radius:10px;max-width:660px;margin:0 auto;">`;
+
+  cats.forEach(cat => {
+    const group = patterns.filter(p => p.category === cat);
+    html += `<div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${catLabels[cat] || cat}</div>`;
+    group.forEach(p => {
+      const c = barColor(p.winRate);
+      const be = p.bes > 0 ? ` / ${p.bes} BE` : "";
+      html += `<div style="margin-bottom:8px;padding:9px 12px;background:#2d1218;border-radius:6px;border-left:3px solid ${c};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span style="font-size:13px;font-weight:600;color:#f5f5f5;text-transform:capitalize;">${p.label}</span>
+          <span style="font-size:11px;color:#aaa;">${p.wins}W / ${p.losses}L${be} · ${p.total} trades</span>
+        </div>
+        <div style="background:#3d1a22;border-radius:3px;height:8px;overflow:hidden;">
+          <div style="width:${Math.max(p.winRate, 2)}%;height:100%;background:${c};border-radius:3px;"></div>
+        </div>
+        <div style="font-size:11px;color:${c};font-weight:700;text-align:right;margin-top:3px;">${p.winRate}% WR</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 2 — Trade Replay Analyzer
+// ════════════════════════════════════════════════════════════════
+function analyzeTrade(trade) {
+  if (trade == null) return { message: "No trade data provided.", severity: "info" };
+  const { checklist, confidence, grade, result } = trade;
+
+  if (checklist != null && checklist.sweep === false)
+    return { message: "Trade taken without liquidity sweep — Rule #1 violated.", severity: "warning" };
+
+  if (confidence != null && confidence <= 4)
+    return { message: "Low confidence trade detected (≤4/10) — high risk entry.", severity: "warning" };
+
+  if (grade != null && (grade === "B" || grade === "B-" || grade === "C"))
+    return { message: `Low-quality setup (Grade ${grade}) — below minimum standard.`, severity: "warning" };
+
+  if (result === "Loss" && checklist != null && checklist.valid === false)
+    return { message: "Invalid entry detected — entry was not valid (inversion not confirmed).", severity: "warning" };
+
+  const full = checklist != null && checklist.sweep && checklist.ifvg && checklist.valid &&
+               checklist.target && checklist.pd && checklist.momentum;
+  if (full && (confidence == null || confidence >= 8) && (grade == null || grade === "A+" || grade === "A"))
+    return { message: "A+ execution — full checklist, high conviction, clean setup.", severity: "good" };
+
+  return { message: "Valid trade execution.", severity: "info" };
+}
+
+function renderTradeAnalysis(trade) {
+  const { message, severity } = analyzeTrade(trade);
+  const S = { warning: { border:"#ffa726", text:"#e53935", label:"Warning" },
+               good:    { border:"#4caf50", text:"#4caf50", label:"Good" },
+               info:    { border:"#42a5f5", text:"#42a5f5", label:"Info" } };
+  const { border, text, label } = S[severity] || S.info;
+  return `<div style="background:#1e0d10;border-left:3px solid ${border};border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:13px;line-height:1.4;">
+    <span style="color:${border};font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.08em;display:block;margin-bottom:3px;">${label}</span>
+    <span style="color:${text};">${message}</span>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 3 — Core Analytics Metrics
+// ════════════════════════════════════════════════════════════════
+function calculateWinRate(trades) {
+  if (!Array.isArray(trades) || !trades.length) return 0;
+  const wins = trades.filter(t => t.result === "Win").length;
+  const total = wins + trades.filter(t => t.result === "Loss").length;
+  return total === 0 ? 0 : Math.round((wins / total) * 100);
+}
+
+function calculateExpectancy(trades) {
+  if (!Array.isArray(trades) || !trades.length) return null;
+  const wins = trades.filter(t => t.result === "Win");
+  const losses = trades.filter(t => t.result === "Loss");
+  const total = wins.length + losses.length;
+  if (!total) return null;
+  const winRRs = wins.map(t => parseRR(t.rr)).filter(v => v !== null);
+  if (!winRRs.length) return null;
+  const avgWin  = winRRs.reduce((s, v) => s + v, 0) / winRRs.length;
+  const avgLoss = losses.length ? losses.map(t => parseRR(t.rr) ?? 1).reduce((s,v) => s+v,0) / losses.length : 1;
+  return Math.round(((wins.length/total)*avgWin - (losses.length/total)*avgLoss) * 100) / 100;
+}
+
+function calculateProfitFactor(trades) {
+  if (!Array.isArray(trades) || !trades.length) return null;
+  const winSum  = trades.filter(t => t.result === "Win").reduce((s,t) => s + (parseRR(t.rr) ?? 0), 0);
+  const lossSum = trades.filter(t => t.result === "Loss").reduce((s,t) => s + (parseRR(t.rr) ?? 1), 0);
+  return lossSum === 0 ? null : Math.round((winSum / lossSum) * 100) / 100;
+}
+
+function calculateMaxLossStreak(trades) {
+  if (!Array.isArray(trades) || !trades.length) return 0;
+  let max = 0, cur = 0;
+  for (const t of trades) { t.result === "Loss" ? (cur++, max = Math.max(max, cur)) : (cur = 0); }
+  return max;
+}
+
+function calculateAverageRR(trades) {
+  if (!Array.isArray(trades) || !trades.length) return null;
+  const vals = trades.map(t => parseRR(t.rr)).filter(v => v !== null);
+  return vals.length ? Math.round(vals.reduce((s,v) => s+v, 0) / vals.length * 100) / 100 : null;
+}
+
+function renderCoreMetrics(trades) {
+  const wr  = calculateWinRate(trades);
+  const exp = calculateExpectancy(trades);
+  const pf  = calculateProfitFactor(trades);
+  const mls = calculateMaxLossStreak(trades);
+  const arr = calculateAverageRR(trades);
+  const fmt = (v, sfx="") => v === null || v === undefined ? "—" : `${v}${sfx}`;
+  const expClr = exp === null ? "#a0a0a0" : exp > 0 ? "#4ade80" : "#f87171";
+  const pfClr  = pf  === null ? "#a0a0a0" : pf  > 1 ? "#4ade80" : "#f87171";
+
+  const cards = [
+    { label:"Win Rate",        value:fmt(wr, "%"),  color:"#e2e8f0" },
+    { label:"Avg R:R",         value:fmt(arr),      color:"#e2e8f0" },
+    { label:"Expectancy",      value:fmt(exp),      color:expClr    },
+    { label:"Profit Factor",   value:fmt(pf),       color:pfClr     },
+    { label:"Max Loss Streak", value:fmt(mls),      color:"#e2e8f0" },
+  ];
+
+  const cardHTML = cards.map(({label, value, color}) =>
+    `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:#2d1117;border:1px solid #3d1f27;border-radius:8px;padding:14px 20px;min-width:110px;flex:1;">
+      <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b6370;margin-bottom:7px;white-space:nowrap;">${label}</span>
+      <span style="font-size:26px;font-weight:700;color:${color};line-height:1;">${value}</span>
+    </div>`
+  ).join("");
+
+  return `<div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px;background:#1e0d10;border-radius:10px;font-family:system-ui,sans-serif;">${cardHTML}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 4 — Insight Generator
+// ════════════════════════════════════════════════════════════════
+function generateInsights(trades) {
+  if (!Array.isArray(trades) || trades.length < 3) return [];
+  const insights = [];
+  const isWin  = t => t?.result === "Win";
+  const isLoss = t => t?.result === "Loss";
+  const wr = arr => arr.length ? arr.filter(isWin).length / arr.length : 0;
+  const _rr = rr => { if (!rr) return 1; const s = String(rr).trim(); if (s.includes(":")) { const [r,w]=s.split(":"); return isNaN(+r)||+r===0?1:+w/+r; } return isNaN(+s)?1:+s; };
+
+  // 1. Losing streak
+  let streak = 0;
+  for (let i = trades.length - 1; i >= 0; i--) { if (isLoss(trades[i])) streak++; else break; }
+  if (streak >= 4) insights.push({ message:`You are on a <strong>${streak}-trade losing streak</strong>. Step back and review before your next trade.`, severity:"warning", category:"streak" });
+  else if (streak >= 2) insights.push({ message:`Current losing streak: <strong>${streak} trades</strong>. Stay disciplined.`, severity:"warning", category:"streak" });
+
+  // 2. Low confidence losses
+  const losses = trades.filter(isLoss);
+  const lcl = losses.filter(t => t.confidence != null && t.confidence <= 5);
+  if (losses.filter(t=>t.confidence!=null).length >= 2) {
+    const pct = Math.round(lcl.length / losses.filter(t=>t.confidence!=null).length * 100);
+    if (pct >= 40) insights.push({ message:`<strong>${pct}%</strong> of your losses had confidence ≤5. Low-confidence trades are costing you.`, severity:"warning", category:"confidence" });
+  }
+
+  // 3. No sweep violations
+  const noSweep = trades.filter(t => isLoss(t) && t.checklist != null && t.checklist.sweep === false);
+  if (noSweep.length >= 2) insights.push({ message:`<strong>${noSweep.length} losses</strong> without sweep confirmation. No sweep = no trade.`, severity:"warning", category:"rules" });
+
+  // 4+5. Best/worst pair×type combo
+  const groups = {};
+  trades.forEach(t => { if (!t.pair || !t.tradeType) return; const k=`${t.pair} ${t.tradeType}`; if (!groups[k]) groups[k]=[]; groups[k].push(t); });
+  const eligible = Object.entries(groups).filter(([,a])=>a.length>=3).map(([k,a])=>({k,wr:wr(a),n:a.length})).sort((a,b)=>b.wr-a.wr);
+  if (eligible.length) {
+    insights.push({ message:`Best setup: <strong>${eligible[0].k}</strong> — <strong>${Math.round(eligible[0].wr*100)}% WR</strong> (${eligible[0].n} trades).`, severity:"good", category:"setup" });
+    if (eligible.length >= 2) insights.push({ message:`Worst setup: <strong>${eligible[eligible.length-1].k}</strong> — <strong>${Math.round(eligible[eligible.length-1].wr*100)}% WR</strong>. Review or reduce.`, severity:"warning", category:"setup" });
+  }
+
+  // 6. Reversal vs Continuation
+  const rev  = trades.filter(t => t.tradeType === "Reversal");
+  const cont = trades.filter(t => t.tradeType === "Continuation");
+  if (rev.length >= 3 && cont.length >= 3) {
+    const rw = wr(rev), cw = wr(cont);
+    const better = rw >= cw ? "Reversal" : "Continuation";
+    insights.push({ message:`<strong>${better}</strong> trades outperform (${Math.round(Math.max(rw,cw)*100)}% vs ${Math.round(Math.min(rw,cw)*100)}%). Lean into your stronger model.`, severity:"info", category:"model" });
+  }
+
+  // 7. Grade gap
+  const hiG = trades.filter(t => t.grade === "A+" || t.grade === "A");
+  const loG = trades.filter(t => t.grade && !["A+","A"].includes(t.grade));
+  if (hiG.length >= 2 && loG.length >= 2) {
+    const diff = Math.round((wr(hiG) - wr(loG)) * 100);
+    if (diff >= 20) insights.push({ message:`A/A+ setups win <strong>${Math.round(wr(hiG)*100)}%</strong> vs <strong>${Math.round(wr(loG)*100)}%</strong> for lower grades — <strong>${diff}pp gap</strong>. Focus on A-quality entries.`, severity:"good", category:"grade" });
+  }
+
+  // 8. Profit factor
+  const wl = trades.filter(t => t.result==="Win"||t.result==="Loss");
+  if (wl.length >= 3) {
+    const ws = wl.filter(isWin).reduce((s,t)=>s+_rr(t.rr),0);
+    const ls = wl.filter(isLoss).reduce((s,t)=>s+_rr(t.rr),0);
+    if (ls > 0) {
+      const pf = (ws/ls).toFixed(2);
+      if (+pf < 1)   insights.push({ message:`Profit factor is <strong>${pf}</strong> — below 1.0. You're losing more than you win in R-terms.`, severity:"warning", category:"profitfactor" });
+      else if (+pf > 1.5) insights.push({ message:`Profit factor is <strong>${pf}</strong> — your winners outweigh your losers in R-terms.`, severity:"good", category:"profitfactor" });
+    }
+  }
+
+  // 9. Win rate trend
+  if (trades.length >= 6) {
+    const mid = Math.floor(trades.length / 2);
+    const diff = Math.round((wr(trades.slice(mid)) - wr(trades.slice(0,mid))) * 100);
+    if (diff <= -15) insights.push({ message:`Win rate dropped <strong>${Math.abs(diff)}pp</strong> in recent trades. Something has changed — review.`, severity:"warning", category:"trend" });
+    else if (diff >= 15) insights.push({ message:`Win rate improved <strong>${diff}pp</strong> in recent trades. You're getting better — keep going.`, severity:"good", category:"trend" });
+  }
+
+  // 10. Revenge trading
+  let rev2 = 0;
+  for (let i = 1; i < trades.length; i++) if (isLoss(trades[i-1]) && isLoss(trades[i]) && trades[i-1].pair === trades[i].pair) rev2++;
+  if (rev2 >= 2) insights.push({ message:`<strong>${rev2} back-to-back losses</strong> on the same instrument detected. Revenge trading pattern — walk away after a loss.`, severity:"warning", category:"behavior" });
+
+  const order = { warning:0, good:1, info:2 };
+  insights.sort((a,b) => (order[a.severity]??3) - (order[b.severity]??3));
+  return insights;
+}
+
+function renderInsights(insights) {
+  if (!Array.isArray(insights) || !insights.length)
+    return `<p style="color:#888;font-size:14px;">No insights yet — add more trades.</p>`;
+  const bc = { warning:"#e53935", good:"#4caf50", info:"#42a5f5" };
+  const ic = { warning:"⚠️", good:"✅", info:"ℹ️" };
+  const tb = { warning:"#4a1010", good:"#0d3b1e", info:"#0d2a4a" };
+  const tc = { warning:"#ef9a9a", good:"#a5d6a7", info:"#90caf9" };
+  const cards = insights.map(({message,severity,category}) => {
+    const s = ["warning","good","info"].includes(severity) ? severity : "info";
+    return `<div style="display:flex;align-items:flex-start;background:#1e1e1e;border-left:4px solid ${bc[s]};border-radius:6px;padding:11px 14px;margin-bottom:9px;font-family:'Segoe UI',sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4);">
+      <span style="font-size:18px;margin-right:11px;flex-shrink:0;line-height:1.4;">${ic[s]}</span>
+      <div style="flex:1;">
+        <span style="color:#e0e0e0;font-size:14px;line-height:1.6;">${message}</span>
+        <div style="margin-top:5px;"><span style="background:${tb[s]};color:${tc[s]};font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:2px 8px;border-radius:4px;">${category}</span></div>
+      </div>
+    </div>`;
+  });
+  return `<div style="max-width:680px;">${cards.join("")}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 5 — Deep Analytics (Enhancements)
+// ════════════════════════════════════════════════════════════════
+function analyzeTimeOfDay(trades) {
+  if (!Array.isArray(trades) || !trades.length) return [];
+  function getSession(h, m) {
+    const t = h*60+m;
+    if (t < 570) return "Pre-Market (< 9:30)";
+    if (t < 660) return "NY Open (9:30–11:00)";
+    if (t < 840) return "Midday (11:00–14:00)";
+    if (t < 960) return "NY Afternoon (14:00–16:00)";
+    return "Other";
+  }
+  function parseHM(dt) {
+    if (!dt || typeof dt !== "string") return null;
+    const m = dt.match(/(\d{1,2}):(\d{2})/);
+    return m ? { h: parseInt(m[1],10), m: parseInt(m[2],10) } : null;
+  }
+  const b = {};
+  for (const t of trades) {
+    const p = parseHM(t.datetime); if (!p) continue;
+    const s = getSession(p.h, p.m);
+    if (!b[s]) b[s] = {wins:0,losses:0,total:0};
+    b[s].total++; if (t.result==="Win") b[s].wins++; if (t.result==="Loss") b[s].losses++;
+  }
+  return Object.entries(b).filter(([,v])=>v.total>=2)
+    .map(([s,v])=>({session:s,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .sort((a,b)=>b.winRate-a.winRate);
+}
+
+function analyzeByGrade(trades) {
+  if (!Array.isArray(trades) || !trades.length) return [];
+  const b = {};
+  for (const t of trades) {
+    if (!t.grade) continue;
+    if (!b[t.grade]) b[t.grade]={wins:0,losses:0,total:0,cs:0,cc:0};
+    b[t.grade].total++; if (t.result==="Win") b[t.grade].wins++; if (t.result==="Loss") b[t.grade].losses++;
+    const c = parseFloat(t.confidence); if (!isNaN(c)&&c>=1&&c<=10) { b[t.grade].cs+=c; b[t.grade].cc++; }
+  }
+  return Object.entries(b).filter(([,v])=>v.total>=2)
+    .map(([g,v])=>({grade:g,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100),avgConfidence:v.cc?Math.round(v.cs/v.cc*10)/10:null}))
+    .sort((a,b)=>b.winRate-a.winRate);
+}
+
+function analyzeByConfidence(trades) {
+  if (!Array.isArray(trades) || !trades.length) return [];
+  const BANDS = ["High (8–10)","Medium (6–7)","Low (4–5)","Very Low (1–3)"];
+  const getBand = c => c>=8?"High (8–10)":c>=6?"Medium (6–7)":c>=4?"Low (4–5)":c>=1?"Very Low (1–3)":null;
+  const b = {};
+  for (const t of trades) {
+    const c = parseFloat(t.confidence); if (isNaN(c)||c<1||c>10) continue;
+    const band = getBand(c); if (!band) continue;
+    if (!b[band]) b[band]={wins:0,losses:0,total:0};
+    b[band].total++; if (t.result==="Win") b[band].wins++; if (t.result==="Loss") b[band].losses++;
+  }
+  return Object.entries(b).filter(([,v])=>v.total>=2)
+    .map(([band,v])=>({band,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .sort((a,b)=>BANDS.indexOf(a.band)-BANDS.indexOf(b.band));
+}
+
+function findBestWorstSetups(trades) {
+  if (!Array.isArray(trades) || !trades.length) return {best:null,worst:null};
+  const b = {};
+  for (const t of trades) {
+    if (!t.pair||!t.tradeType) continue;
+    const k=`${t.pair} – ${t.tradeType}`;
+    if (!b[k]) b[k]={wins:0,losses:0,total:0};
+    b[k].total++; if (t.result==="Win") b[k].wins++; if (t.result==="Loss") b[k].losses++;
+  }
+  const q = Object.entries(b).filter(([,v])=>v.total>=3)
+    .map(([label,v])=>({label,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .sort((a,b)=>b.winRate-a.winRate);
+  return q.length ? {best:q[0],worst:q[q.length-1]} : {best:null,worst:null};
+}
+
+function renderEnhancements(trades) {
+  if (!Array.isArray(trades) || !trades.length) return "";
+  const BG="#1e0d10",CB="#2a1218",BD="#4a1e28",TX="#f0d0d8",MT="#a07080",WC="#4caf80",LC="#e05050",BB="#3a1a20";
+  const barClr = wr => wr>=60?WC:wr>=40?"#f0c040":LC;
+
+  function card(title,body) {
+    return `<div style="background:${CB};border:1px solid ${BD};border-radius:10px;padding:16px 18px;margin-bottom:16px;">
+      <h3 style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:${TX};">${title}</h3>${body}</div>`;
+  }
+  function barRow(label,wins,losses,total,wr,extra) {
+    const c=barClr(wr), ex=extra?`<span style="color:${MT};font-size:11px;margin-left:7px;">${extra}</span>`:"";
+    return `<div style="margin-bottom:9px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+        <span style="color:${TX};font-size:12px;font-weight:500;">${label}</span>
+        <span style="color:${c};font-size:12px;font-weight:700;">${wr}% <span style="color:${MT};font-weight:400;font-size:11px;">${wins}W/${losses}L/${total}T</span>${ex}</span>
+      </div>
+      <div style="background:${BB};border-radius:3px;height:6px;overflow:hidden;"><div style="width:${wr}%;height:100%;background:${c};border-radius:3px;"></div></div>
+    </div>`;
+  }
+
+  let html = `<div style="background:${BG};padding:8px;font-family:'Segoe UI',Arial,sans-serif;">`;
+
+  const tod = analyzeTimeOfDay(trades);
+  if (tod.length) html += card("Session Performance", tod.map(s=>barRow(s.session,s.wins,s.losses,s.total,s.winRate)).join(""));
+
+  const gd = analyzeByGrade(trades);
+  if (gd.length) html += card("Performance by Grade", gd.map(g=>barRow(g.grade,g.wins,g.losses,g.total,g.winRate,g.avgConfidence?`Avg conf: ${g.avgConfidence}`:null)).join(""));
+
+  const cd = analyzeByConfidence(trades);
+  if (cd.length) {
+    const rows = cd.map(c=>{const cl=barClr(c.winRate);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;margin-bottom:5px;background:${BB};border-radius:6px;">
+      <span style="color:${TX};font-size:12px;font-weight:500;">${c.band}</span>
+      <div><span style="color:${cl};font-weight:700;font-size:13px;">${c.winRate}%</span><span style="color:${MT};font-size:11px;margin-left:5px;">${c.wins}W/${c.losses}L/${c.total}T</span></div>
+    </div>`;}).join("");
+    html += card("Win Rate by Confidence Level", rows);
+  }
+
+  const {best,worst} = findBestWorstSetups(trades);
+  if (best||worst) {
+    function pill(label,setup,ac) {
+      if (!setup) return "";
+      const rc=barClr(setup.winRate);
+      return `<div style="flex:1;background:${BB};border:1px solid ${BD};border-radius:8px;padding:12px 14px;min-width:150px;">
+        <div style="font-size:10px;text-transform:uppercase;color:${ac};letter-spacing:.6px;margin-bottom:5px;">${label}</div>
+        <div style="font-size:14px;font-weight:700;color:${TX};margin-bottom:5px;">${setup.label}</div>
+        <div style="font-size:20px;font-weight:800;color:${rc};">${setup.winRate}%</div>
+        <div style="font-size:11px;color:${MT};margin-top:3px;">${setup.wins}W/${setup.losses}L/${setup.total}T</div>
+      </div>`;
+    }
+    html += card("Best & Worst Setup Combinations",`<div style="display:flex;gap:10px;flex-wrap:wrap;">${pill("Best Setup",best,WC)}${pill("Worst Setup",worst,LC)}</div>`);
+  }
+
+  html += "</div>";
+  return html;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  INTEGRATION — inject sections + patch detail panel
+// ════════════════════════════════════════════════════════════════
+(function() {
+  const trades = JSON.parse(localStorage.getItem("trades")) || [];
+  if (trades.length < 3) return;
+
+  const content = document.getElementById("content");
+  if (!content) return;
+
+  // Build new analytics HTML
+  let html = "";
+
+  // Core metrics
+  html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Core Analytics</div>
+    <div style="max-width:900px;margin:0 auto;padding:0 16px 8px;">${renderCoreMetrics(trades)}</div>`;
+
+  // AI Insights
+  const ins = generateInsights(trades);
+  if (ins.length)
+    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">AI Insights</div>
+      <div style="max-width:700px;margin:0 auto;padding:0 16px;">${renderInsights(ins)}</div>`;
+
+  // Pattern Stats Engine
+  const pats = generatePatternStats(trades);
+  if (pats.length)
+    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Pattern Statistics Engine</div>
+      <div style="max-width:700px;margin:0 auto;padding:0 16px;">${renderPatternStats(pats)}</div>`;
+
+  // Deep Analytics
+  const enh = renderEnhancements(trades);
+  if (enh)
+    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Deep Analytics</div>
+      <div style="max-width:700px;margin:0 auto;padding:0 16px 8px;">${enh}</div>`;
+
+  // Insert before the last <hr class="divider"> (sits just before "Journals")
+  const dividers = content.querySelectorAll("hr.divider");
+  const anchor = dividers[dividers.length - 1];
+  if (anchor) anchor.insertAdjacentHTML("beforebegin", html);
+  else content.insertAdjacentHTML("beforeend", html);
+
+  // Patch openDetailPanel to prepend trade analysis card
+  const _orig = window.openDetailPanel;
+  if (typeof _orig === "function") {
+    window.openDetailPanel = function(index) {
+      _orig(index);
+      const t = (JSON.parse(localStorage.getItem("trades")) || [])[index];
+      if (!t) return;
+      const body = document.getElementById("detail-body");
+      if (body) body.insertAdjacentHTML("afterbegin", renderTradeAnalysis(t));
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
