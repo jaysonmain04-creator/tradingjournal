@@ -1,807 +1,1281 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Replay — Trade Analysis</title>
-  <style>
-    * { box-sizing: border-box; }
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Trading Journal</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial;
+        background-color: #401d23;
+        color: white;
+        text-align: center;
+      }
 
-    body {
-      margin: 0;
-      font-family: Arial;
-      background-color: #401d23;
-      color: white;
-      min-height: 100vh;
-    }
+      h1 {
+        margin-top: 40px;
+        font-size: 40px;
+      }
 
-    nav {
-      background: #2b0f14;
-      padding: 12px 0;
-      text-align: center;
-    }
+      .box {
+        margin: 40px auto;
+        padding: 20px;
+        max-width: 640px;
+        width: 95%;
+        background: #5a2a31;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.6);
+      }
 
-    nav a {
-      color: white;
-      text-decoration: none;
-      margin: 0 20px;
-      font-weight: bold;
-      font-size: 14px;
-      cursor: pointer;
-    }
+      .form-columns {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
 
-    nav a:hover { opacity: 1 !important; text-decoration: underline; }
+      .form-left {
+        flex: 1;
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+      }
 
-    h1 {
-      text-align: center;
-      margin: 28px 0 8px;
-      font-size: 36px;
-    }
+      .form-right {
+        flex: 0 0 185px;
+      }
 
-    .page-sub {
-      text-align: center;
-      color: #888;
-      font-size: 13px;
-      margin-bottom: 20px;
-    }
+      input, select {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        border: none;
+        background: #2b0f14;
+        color: white;
+        font-size: 14px;
+        box-sizing: border-box;
+        appearance: none;
+        -webkit-appearance: none;
+      }
 
-    /* ── Trade selector row ── */
-    #selector-wrap {
-      padding: 0 16px 16px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaa'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+      }
 
-    #selector-label {
-      font-size: 11px;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
-    }
+      .file-label {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        background: #2b0f14;
+        color: #aaa;
+        font-size: 14px;
+        box-sizing: border-box;
+        cursor: pointer;
+        text-align: left;
+        border: 2px dashed transparent;
+        transition: border-color 0.15s, background 0.15s;
+      }
 
-    #trade-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
+      .file-label:hover {
+        background: #3a1018;
+      }
 
-    @media (max-width: 1100px) { #trade-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 760px)  { #trade-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 480px)  { #trade-grid { grid-template-columns: 1fr; } }
+      .file-label.drag-over {
+        border-color: #8b3a44;
+        background: #3a1018;
+        color: white;
+      }
 
-    .trade-card {
-      background: #2b0f14;
-      border-radius: 8px;
-      padding: 10px 13px;
-      cursor: pointer;
-      border-left: 3px solid transparent;
-      transition: background 0.15s, border-color 0.15s;
-      height: 100px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
-      position: relative;
-    }
+      #image {
+        display: none;
+      }
 
-    .trade-card:hover { background: #351319; }
-    .trade-card.selected { background: #3d1520; outline: 2px solid #8b3a44; }
-    .trade-card.win-card  { border-left-color: #4caf50; }
-    .trade-card.loss-card { border-left-color: #e53935; }
-    .trade-card.be-card   { border-left-color: #42a5f5; }
+      #preview {
+        display: none;
+        width: 90%;
+        margin: 6px auto 0;
+        border-radius: 5px;
+        overflow: hidden;
+      }
 
-    .tc-date { font-size: 10px; color: #888; }
-    .tc-pair { font-size: 16px; font-weight: bold; }
-    .tc-result { font-weight: bold; font-size: 13px; }
-    .tc-meta { font-size: 11px; color: #aaa; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-    .tc-grade { font-size: 11px; font-weight: bold; background: #1a0a0c; padding: 1px 7px; border-radius: 4px; }
-    .tc-conf { font-size: 11px; }
+      #preview img {
+        width: 100%;
+        border-radius: 5px;
+        display: block;
+      }
 
-    .no-trades-msg {
-      text-align: center;
-      color: #888;
-      padding: 40px 16px;
-      font-size: 14px;
-    }
+      button {
+        width: 93%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 5px;
+        border: none;
+        background: #8b3a44;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+      }
 
-    /* ── Divider ── */
-    .divider {
-      max-width: 1400px;
-      margin: 4px auto 20px;
-      padding: 0 16px;
-      border: none;
-      border-top: 1px solid #3a1018;
-    }
+      button:hover {
+        background: #a44b55;
+      }
 
-    /* ── Analysis panel ── */
-    #analysis-wrap {
-      max-width: 900px;
-      margin: 0 auto 60px;
-      padding: 0 16px;
-    }
+      #trades {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 10px 16px 40px;
+        box-sizing: border-box;
+      }
 
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #555;
-      font-size: 16px;
-    }
+      #trades > p {
+        grid-column: 1 / -1;
+        text-align: center;
+      }
 
-    .empty-state .empty-icon {
-      font-size: 48px;
-      display: block;
-      margin-bottom: 14px;
-      opacity: 0.4;
-    }
+      @media (max-width: 1100px) { #trades { grid-template-columns: repeat(3, 1fr); } }
+      @media (max-width: 760px)  { #trades { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 480px)  { #trades { grid-template-columns: 1fr; } }
 
-    /* ── Header strip ── */
-    .analysis-header {
-      background: #2b0f14;
-      border-radius: 10px;
-      padding: 18px 22px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
+      .trade {
+        background: #2b0f14;
+        margin: 0;
+        padding: 12px 16px;
+        width: auto;
+        border-radius: 8px;
+        position: relative;
+        box-sizing: border-box;
+        text-align: left;
+        line-height: 1.5;
+        height: 200px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
 
-    .ah-pair { font-size: 26px; font-weight: bold; }
-    .ah-result { font-size: 18px; font-weight: bold; }
-    .ah-grade {
-      font-size: 14px;
-      font-weight: bold;
-      padding: 3px 12px;
-      border-radius: 6px;
-      background: #1a0a0c;
-    }
-    .ah-type { font-size: 13px; color: #aaa; background: #1a0a0c; padding: 3px 10px; border-radius: 5px; }
-    .ah-date { font-size: 12px; color: #888; margin-left: auto; }
+      .trade:hover { background: #351319; }
 
-    /* ── Stats row ── */
-    .stats-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
+      .trade::after {
+        content: "";
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 56px;
+        background: linear-gradient(transparent, #2b0f14);
+        pointer-events: none;
+        transition: background 0.15s;
+      }
 
-    .stat-card {
-      background: #2b0f14;
-      border-radius: 8px;
-      padding: 14px 18px;
-      flex: 1;
-      min-width: 100px;
-      text-align: left;
-    }
+      .trade:hover::after { background: linear-gradient(transparent, #351319); }
 
-    .stat-label {
-      font-size: 10px;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-    }
+      .trade img {
+        width: 100%;
+        border-radius: 5px;
+        margin-top: 8px;
+        display: block;
+        cursor: pointer;
+      }
 
-    .stat-value {
-      font-size: 22px;
-      font-weight: bold;
-    }
+      /* ── Trade detail panel ── */
+      #detail-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+      }
+      #detail-overlay.open { display: block; }
 
-    /* ── Section containers ── */
-    .section-card {
-      background: #2b0f14;
-      border-radius: 10px;
-      padding: 16px 18px;
-      margin-bottom: 14px;
-    }
+      #detail-panel {
+        position: fixed;
+        top: 0;
+        right: -560px;
+        width: 540px;
+        height: 100%;
+        background: #1e0d10;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -4px 0 24px rgba(0,0,0,0.6);
+      }
+      #detail-panel.open { right: 0; }
 
-    .section-title {
-      font-size: 10px;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      font-weight: bold;
-    }
+      .detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #3a1018;
+        flex-shrink: 0;
+      }
+      .detail-header-left { text-align: left; }
+      .detail-title { font-size: 18px; font-weight: bold; color: white; }
+      .detail-subtitle { font-size: 12px; color: #888; margin-top: 2px; }
+      .detail-close {
+        background: #3a1018;
+        color: #aaa;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 14px;
+        font-size: 18px;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+        line-height: 1;
+      }
+      .detail-close:hover { background: #5a2a31; color: white; }
 
-    /* ── AI Analysis card ── */
-    .ai-card {
-      border-radius: 6px;
-      padding: 12px 14px;
-      border-left: 3px solid;
-      font-size: 14px;
-      line-height: 1.5;
-    }
+      .detail-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px 30px;
+      }
+      .detail-body::-webkit-scrollbar { width: 5px; }
+      .detail-body::-webkit-scrollbar-track { background: transparent; }
+      .detail-body::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
 
-    .ai-severity-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      display: block;
-      margin-bottom: 4px;
-    }
+      .detail-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .detail-stat {
+        background: #2b0f14;
+        border-radius: 7px;
+        padding: 10px 16px;
+        flex: 1;
+        min-width: 80px;
+        text-align: left;
+      }
+      .detail-stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+      .detail-stat-value { font-size: 18px; font-weight: bold; }
 
-    /* ── Checklist ── */
-    .checklist-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
+      .detail-section-title {
+        font-size: 10px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 18px 0 8px;
+      }
 
-    @media (max-width: 560px) { .checklist-grid { grid-template-columns: repeat(2, 1fr); } }
+      .detail-notes {
+        background: #2b0f14;
+        border-radius: 7px;
+        padding: 14px 16px;
+        line-height: 1.6;
+      }
 
-    .cl-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      padding: 8px 12px;
-      border-radius: 6px;
-    }
+      .detail-img {
+        width: 100%;
+        border-radius: 7px;
+        margin-top: 14px;
+        display: block;
+        cursor: pointer;
+      }
 
-    .cl-item.pass { background: #1b4d1e; color: #81c784; }
-    .cl-item.fail { background: #2b1015; color: #555; }
+      @media (max-width: 560px) {
+        #detail-panel { width: 100%; right: -100%; }
+      }
 
-    .cl-icon { font-size: 14px; font-weight: bold; flex-shrink: 0; }
+      .delete-btn {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        width: auto;
+        padding: 2px 7px;
+        margin: 0;
+        background: #6b1a22;
+        font-size: 12px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
 
-    /* ── Mistake badges ── */
-    .mistakes-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
+      .delete-btn:hover {
+        background: #c0392b;
+      }
 
-    .mistake-badge {
-      background: #3a0e10;
-      border-left: 3px solid #e53935;
-      border-radius: 5px;
-      padding: 9px 14px;
-      font-size: 13px;
-      color: #f28b82;
-      line-height: 1.4;
-    }
+      .tabs {
+        margin: 10px auto 4px;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
 
-    .no-violations {
-      background: #1b3a1e;
-      border-left: 3px solid #4caf50;
-      border-radius: 5px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: #81c784;
-    }
+      .tab {
+        width: auto;
+        padding: 7px 20px;
+        margin: 0;
+        border-radius: 20px;
+        font-size: 13px;
+        background: #2b0f14;
+        color: #aaa;
+        font-weight: bold;
+      }
 
-    /* ── Chart image ── */
-    .chart-img {
-      width: 100%;
-      border-radius: 8px;
-      display: block;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .chart-img:hover { opacity: 0.9; }
+      .tab:hover { background: #3a1018; color: #ccc; }
 
-    /* ── Notes ── */
-    .notes-content {
-      font-size: 14px;
-      color: #ddd;
-      line-height: 1.7;
-      white-space: pre-line;
-    }
+      .tab.active { background: #5a2a31; color: #ffffff; }
 
-    .note-line-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #aaa;
-      font-weight: bold;
-      display: block;
-      margin-bottom: 2px;
-    }
+      .trade.win-trade  { border-left: 3px solid #4caf50; }
+      .trade.loss-trade { border-left: 3px solid #e53935; }
+      .trade.be-trade   { border-left: 3px solid #42a5f5; }
 
-    .note-line-val {
-      font-size: 14px;
-      color: #ddd;
-      display: block;
-      margin-bottom: 10px;
-    }
+      .trade-date {
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 4px;
+        cursor: pointer;
+        text-align: left;
+      }
 
-    /* ── Pattern context ── */
-    .pattern-lines {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
+      .trade-date:hover {
+        color: #bbb;
+        text-decoration: underline;
+      }
 
-    .pattern-line {
-      background: #1a0a0c;
-      border-radius: 6px;
-      padding: 9px 14px;
-      font-size: 13px;
-      color: #bbb;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+      /* Lightbox */
+      #lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 999;
+        justify-content: center;
+        align-items: center;
+      }
 
-    .pattern-val { font-weight: bold; color: white; }
+      #lightbox.open {
+        display: flex;
+      }
 
-    /* ── Lightbox ── */
-    #lightbox {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.88);
-      z-index: 9999;
-      justify-content: center;
-      align-items: center;
-    }
+      #lightbox img {
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 8px;
+      }
 
-    #lightbox.open { display: flex; }
+      #lightbox-close {
+        position: fixed;
+        top: 16px;
+        right: 20px;
+        font-size: 28px;
+        cursor: pointer;
+        color: white;
+        font-weight: bold;
+        background: none;
+        border: none;
+        width: auto;
+        padding: 0;
+      }
 
-    #lightbox img {
-      max-width: 92vw;
-      max-height: 92vh;
-      border-radius: 8px;
-      display: block;
-    }
+      .checklist-box {
+        width: 100%;
+        margin: 0;
+        background: #2b0f14;
+        border-radius: 5px;
+        padding: 10px 12px;
+        text-align: left;
+        box-sizing: border-box;
+      }
 
-    #lightbox-close {
-      position: fixed;
-      top: 16px;
-      right: 20px;
-      font-size: 30px;
-      cursor: pointer;
-      color: white;
-      font-weight: bold;
-      background: none;
-      border: none;
-      padding: 0;
-      line-height: 1;
-      z-index: 10000;
-    }
-  </style>
-</head>
-<body>
+      .checklist-header {
+        font-size: 11px;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-<nav>
-  <a href="index.html" style="opacity:0.4;">Journal</a>
-  <a href="analysis.html" style="opacity:0.4;">Analysis</a>
-  <a href="replay.html">Replay</a>
-</nav>
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #ccc;
+        padding: 4px 0;
+        cursor: pointer;
+        user-select: none;
+      }
 
-<h1>Replay</h1>
-<p class="page-sub">Select a trade to analyze it in detail</p>
+      .check-item input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        min-width: 15px;
+        accent-color: #8b3a44;
+        cursor: pointer;
+        margin: 0;
+        appearance: auto;
+        -webkit-appearance: auto;
+      }
 
-<!-- Trade selector -->
-<div id="selector-wrap">
-  <div id="selector-label">Select a trade</div>
-  <div id="trade-grid"></div>
-</div>
+      /* ── Note trigger button ── */
+      .note-trigger {
+        width: 100%;
+        padding: 10px 12px;
+        margin: 5px 0;
+        border-radius: 5px;
+        background: #2b0f14;
+        border: 1.5px dashed #4a1e24;
+        color: #888;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        transition: border-color 0.15s, background 0.15s;
+        box-sizing: border-box;
+        font-family: Arial;
+        line-height: 1.4;
+        min-height: 42px;
+      }
+      .note-trigger:hover { border-color: #8b3a44; background: #331218; color: #bbb; }
+      .note-trigger.has-note { border-style: solid; border-color: #5a2a31; color: #ccc; }
+      .note-trigger-icon { font-size: 16px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+      .note-trigger-text { flex: 1; }
+      .note-trigger-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+      .note-trigger-preview { font-size: 13px; color: #ccc; white-space: pre-line; }
 
-<hr class="divider">
+      /* ── Note panel overlay ── */
+      #note-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+      }
+      #note-overlay.open { display: block; }
 
-<!-- Analysis panel -->
-<div id="analysis-wrap">
-  <div id="analysis-panel">
-    <div class="empty-state">
-      <span class="empty-icon">&#x1F4CA;</span>
-      Select a trade above to analyze it
+      /* ── Note panel ── */
+      #note-panel {
+        position: fixed;
+        top: 0;
+        right: -510px;
+        width: 490px;
+        height: 100%;
+        background: #1e0d10;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -4px 0 24px rgba(0,0,0,0.6);
+      }
+      #note-panel.open { right: 0; }
+
+      .note-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #3a1018;
+        flex-shrink: 0;
+      }
+      .note-panel-title {
+        font-size: 13px;
+        font-weight: bold;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .note-panel-done {
+        background: #8b3a44;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 20px;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+      }
+      .note-panel-done:hover { background: #a44b55; }
+
+      .note-doc {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px 30px;
+      }
+      .note-doc::-webkit-scrollbar { width: 5px; }
+      .note-doc::-webkit-scrollbar-track { background: transparent; }
+      .note-doc::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
+
+      .note-q {
+        margin-bottom: 20px;
+      }
+      .note-q-label {
+        font-size: 11px;
+        color: #ffffff;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 7px;
+        display: block;
+      }
+      .note-q textarea {
+        width: 100%;
+        background: #160a0c;
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 7px;
+        color: #ffffff;
+        font-size: 14px;
+        font-family: Georgia, serif;
+        line-height: 1.65;
+        padding: 12px 14px;
+        resize: none;
+        outline: none;
+        box-sizing: border-box;
+        caret-color: #e07080;
+        overflow: hidden;
+        min-height: 52px;
+        transition: border-color 0.15s;
+      }
+      .note-q textarea:focus { border-color: rgba(255,255,255,0.6); }
+      .note-q textarea::placeholder { color: rgba(255,255,255,0.25); font-style: italic; }
+
+      /* Yes / No toggle */
+      .yn-row {
+        display: flex;
+        gap: 8px;
+      }
+      .yn-btn {
+        flex: 1;
+        padding: 9px 0;
+        border-radius: 6px;
+        border: 1.5px solid rgba(255,255,255,0.25);
+        background: #160a0c;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+        transition: all 0.15s;
+      }
+      .yn-btn:hover { border-color: rgba(255,255,255,0.6); color: #fff; background: #1e0d10; }
+      .yn-btn.yn-yes.active { background: #1b3a1e; border-color: #4caf50; color: #4caf50; }
+      .yn-btn.yn-no.active  { background: #3a1018; border-color: #e53935; color: #e53935; }
+
+      /* Confidence slider */
+      .conf-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .conf-row input[type="range"] {
+        flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        background: #2e1015;
+        outline: none;
+        padding: 0;
+        margin: 0;
+        border: none;
+        width: auto;
+      }
+      .conf-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #8b3a44;
+        cursor: pointer;
+      }
+      .conf-value {
+        font-size: 20px;
+        font-weight: bold;
+        min-width: 36px;
+        text-align: right;
+        color: #ccc;
+      }
+      .conf-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: rgba(255,255,255,0.4);
+        margin-top: 4px;
+      }
+
+      @media (max-width: 520px) {
+        #note-panel { width: 100%; right: -100%; }
+      }
+
+      nav {
+        background: #2b0f14;
+        padding: 12px 0;
+        margin-bottom: 0;
+        text-align: center;
+      }
+      nav a {
+        color: white;
+        text-decoration: none;
+        margin: 0 20px;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      nav a:hover { opacity: 1 !important; text-decoration: underline; }
+
+    </style>
+  </head>
+  <body>
+
+  <nav>
+    <a href="index.html">Journal</a>
+    <a href="analysis.html" style="opacity:0.4;">Analysis</a>
+    <a href="replay.html" style="opacity:0.4;">Replay</a>
+  </nav>
+
+  <h1>Trading Journal</h1>
+
+  <div class="box">
+    <div class="form-columns">
+      <div class="form-left">
+        <select id="pair">
+          <option value="">Select Pair</option>
+          <option value="NQ">NQ</option>
+          <option value="ES">ES</option>
+          <option value="MNQ">MNQ</option>
+        </select>
+
+        <select id="result">
+          <option value="">Select Result</option>
+          <option value="Win">Win</option>
+          <option value="Loss">Loss</option>
+          <option value="BE">BE</option>
+        </select>
+
+        <select id="tradeType">
+          <option value="">Trade Type</option>
+          <option value="Reversal">Reversal</option>
+          <option value="Continuation">Continuation</option>
+        </select>
+
+        <input id="rr" placeholder="RR (e.g. 1:2)">
+
+        <button type="button" class="note-trigger" id="note-trigger" onclick="openNotePanel()">
+          <span class="note-trigger-icon">+</span>
+          <span class="note-trigger-text">
+            <div class="note-trigger-label" id="note-trigger-label">Add Note</div>
+            <div class="note-trigger-preview" id="note-trigger-preview"></div>
+          </span>
+          <span id="note-clear-btn" onclick="event.stopPropagation(); clearNote()" title="Remove note"
+                style="display:none; font-size:15px; color:#888; padding:2px 6px; line-height:1; cursor:pointer; border-radius:3px; transition:color 0.15s;"
+                onmouseover="this.style.color='#e06070'" onmouseout="this.style.color='#888'">✕</span>
+        </button>
+
+        <label class="file-label" for="image" id="file-label-text">📎 Click, drag & drop, or paste (Ctrl+V)</label>
+        <input type="file" id="image" accept="image/*">
+        <div id="preview"><img id="preview-img" src="" alt="preview"></div>
+      </div>
+
+      <div class="form-right">
+        <div class="checklist-box">
+          <div class="checklist-header">
+            Checklist
+            <span id="grade-live" style="font-weight:bold;font-size:14px;color:#555;">—</span>
+          </div>
+          <label class="check-item"><input type="checkbox" id="c-sweep"> BSL/SSL Swept</label>
+          <label class="check-item"><input type="checkbox" id="c-ifvg"> IFVG Identified</label>
+          <label class="check-item"><input type="checkbox" id="c-valid"> Valid Entry</label>
+          <label class="check-item"><input type="checkbox" id="c-target"> Clear DOL</label>
+          <label class="check-item"><input type="checkbox" id="c-pd"> Correct P/D</label>
+          <label class="check-item"><input type="checkbox" id="c-momentum"> No Chop</label>
+        </div>
+      </div>
+    </div>
+
+    <button onclick="addTrade()" style="width:100%;margin-top:12px;">Add Trade</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('All')">All</button>
+    <button class="tab win-tab" onclick="setTab('Win')">Wins</button>
+    <button class="tab loss-tab" onclick="setTab('Loss')">Losses</button>
+    <button class="tab be-tab" onclick="setTab('BE')">BE</button>
+  </div>
+  <div id="trades"></div>
+
+  <!-- Note overlay -->
+  <div id="note-overlay" onclick="closeNotePanel()"></div>
+
+  <!-- Note panel -->
+  <div id="note-panel">
+    <div class="note-panel-header">
+      <span class="note-panel-title">Trade Note</span>
+      <button class="note-panel-done" onclick="closeNotePanel()">Done</button>
+    </div>
+    <div class="note-doc">
+
+      <div class="note-q">
+        <span class="note-q-label">Why did you enter this trade?</span>
+        <textarea id="nq-reason" rows="3" oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Was the trade aligned with your analysis?</span>
+        <textarea id="nq-analysis" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Were your rules followed?</span>
+        <textarea id="nq-rules" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Was your mindset in the right place?</span>
+        <textarea id="nq-mindset" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">How did you feel coming into this trade?</span>
+        <textarea id="nq-feeling" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
+
+      <div class="note-q">
+        <span class="note-q-label">Would you take it again if it presented itself?</span>
+        <div class="yn-row">
+          <button type="button" class="yn-btn yn-yes" id="yn-yes" onclick="setYN('yes')">Yes</button>
+          <button type="button" class="yn-btn yn-no"  id="yn-no"  onclick="setYN('no')">No</button>
+        </div>
+      </div>
+
+      <div class="note-q" style="margin-top:24px;">
+        <span class="note-q-label">How confident were you? &nbsp;<span id="conf-value-label" style="color:#8b3a44;font-size:13px;font-weight:bold;">—</span></span>
+        <div class="conf-row">
+          <input type="range" id="nq-confidence" min="1" max="10" value="5" oninput="updateConfLabel()">
+          <span class="conf-value" id="conf-value-display">—</span>
+        </div>
+        <div class="conf-labels"><span>1 – No conviction</span><span>10 – Full confidence</span></div>
+      </div>
+
     </div>
   </div>
-</div>
 
-<!-- Lightbox -->
-<div id="lightbox" onclick="if(event.target===this)closeLightbox()">
-  <button id="lightbox-close" onclick="closeLightbox()">&#x2715;</button>
-  <img id="lightbox-img" src="" alt="chart">
-</div>
+  <!-- Trade detail overlay + panel -->
+  <div id="detail-overlay" onclick="closeDetailPanel()"></div>
+  <div id="detail-panel">
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <div class="detail-title" id="detail-title">—</div>
+        <div class="detail-subtitle" id="detail-subtitle">—</div>
+      </div>
+      <button class="detail-close" onclick="closeDetailPanel()">✕</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
 
-<script>
-// ════════════════════════════════════════════════════════════════
-//  Utility helpers
-// ════════════════════════════════════════════════════════════════
+  <!-- Lightbox -->
+  <div id="lightbox">
+    <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightbox-img" src="" alt="chart">
+  </div>
 
-function parseRR(rr) {
-  if (rr === null || rr === undefined) return null;
-  const s = String(rr).trim();
-  if (!s) return null;
-  const ci = s.indexOf(":");
-  if (ci !== -1) {
-    const risk   = parseFloat(s.slice(0, ci));
-    const reward = parseFloat(s.slice(ci + 1));
-    if (isNaN(risk) || isNaN(reward) || risk === 0) return null;
-    return reward / risk;
+  <script>
+  let trades = JSON.parse(localStorage.getItem("trades")) || [];
+  let pendingImage      = null;
+  let pendingNote       = "";
+  let pendingConfidence = null;
+  let pendingYN         = null;  // "yes" | "no" | null
+  let activeTab = "All";
+
+  // ── Note panel helpers ──
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
   }
-  const v = parseFloat(s);
-  return isNaN(v) ? null : v;
-}
 
-function gradeColor(g) {
-  if (g === "A+") return "#4caf50";
-  if (g === "A")  return "#66bb6a";
-  if (g === "A-") return "#8bc34a";
-  if (g === "B+") return "#ffa726";
-  if (g === "B")  return "#ff7043";
-  if (g === "B-") return "#e53935";
-  return "#b71c1c";
-}
-
-function resultColor(r) {
-  return r === "Win" ? "#4caf50" : r === "Loss" ? "#e53935" : "#42a5f5";
-}
-
-function confColor(c) {
-  if (!c) return "#555";
-  return c >= 8 ? "#4caf50" : c >= 5 ? "#ffa726" : "#e53935";
-}
-
-// ════════════════════════════════════════════════════════════════
-//  Quality Score
-// ════════════════════════════════════════════════════════════════
-function qualityScore(t) {
-  let score = 0, has = false;
-  if (t.checklist) {
-    score += (["sweep","ifvg","valid","target","pd","momentum"].filter(k => t.checklist[k]).length / 6) * 6;
-    has = true;
+  function setYN(val) {
+    pendingYN = val;
+    document.getElementById("yn-yes").classList.toggle("active", val === "yes");
+    document.getElementById("yn-no").classList.toggle("active", val  === "no");
   }
-  if (t.confidence) { score += (t.confidence / 10) * 4; has = true; }
-  return has ? Math.round(score) : null;
-}
 
-// ════════════════════════════════════════════════════════════════
-//  AI Analyzer (from analysis.html Feature 2)
-// ════════════════════════════════════════════════════════════════
-function analyzeTrade(trade) {
-  if (trade == null) return { message: "No trade data provided.", severity: "info" };
-  const { checklist, confidence, grade, result } = trade;
+  // Slider starts unset — only "activate" once user moves it
+  let confTouched = false;
+  function updateConfLabel() {
+    confTouched = true;
+    const v = document.getElementById("nq-confidence").value;
+    const col = v >= 8 ? "#4caf50" : v >= 5 ? "#ffa726" : "#e53935";
+    document.getElementById("conf-value-display").textContent = v + "/10";
+    document.getElementById("conf-value-display").style.color = col;
+    document.getElementById("conf-value-label").textContent = v + "/10";
+    document.getElementById("conf-value-label").style.color = col;
+  }
 
-  if (checklist != null && checklist.sweep === false)
-    return { message: "Trade taken without liquidity sweep — Rule #1 violated.", severity: "warning" };
+  function openNotePanel() {
+    // Restore answers
+    document.getElementById("nq-reason").value    = pendingNoteData.reason;
+    document.getElementById("nq-analysis").value  = pendingNoteData.analysis;
+    document.getElementById("nq-rules").value      = pendingNoteData.rules;
+    document.getElementById("nq-mindset").value    = pendingNoteData.mindset;
+    document.getElementById("nq-feeling").value    = pendingNoteData.feeling;
+    // Restore YN
+    if (pendingYN) setYN(pendingYN);
+    // Restore confidence
+    if (pendingConfidence !== null) {
+      confTouched = true;
+      document.getElementById("nq-confidence").value = pendingConfidence;
+      updateConfLabel();
+    } else {
+      document.getElementById("conf-value-display").textContent = "—";
+      document.getElementById("conf-value-label").textContent  = "—";
+      confTouched = false;
+    }
+    // Auto-resize textareas
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => autoResize(document.getElementById(id)));
 
-  if (confidence != null && confidence <= 4)
-    return { message: "Low confidence trade detected (\u22644/10) — high risk entry.", severity: "warning" };
+    document.getElementById("note-panel").classList.add("open");
+    document.getElementById("note-overlay").classList.add("open");
+    setTimeout(() => document.getElementById("nq-reason").focus(), 280);
+  }
 
-  if (grade != null && (grade === "B" || grade === "B-" || grade === "C"))
-    return { message: `Low-quality setup (Grade ${grade}) — below minimum standard.`, severity: "warning" };
+  function closeNotePanel() {
+    pendingNoteData.reason   = document.getElementById("nq-reason").value.trim();
+    pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
+    pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
+    pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
+    pendingNoteData.feeling  = document.getElementById("nq-feeling").value.trim();
 
-  if (result === "Loss" && checklist != null && checklist.valid === false)
-    return { message: "Invalid entry detected — entry was not valid (inversion not confirmed).", severity: "warning" };
+    // Build combined note string
+    const parts = [];
+    if (pendingNoteData.reason)   parts.push("Why I entered: "         + pendingNoteData.reason);
+    if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
+    if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
+    if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
+    if (pendingNoteData.feeling)  parts.push("Feeling: "               + pendingNoteData.feeling);
+    if (pendingYN)                parts.push("Would take again: "      + (pendingYN === "yes" ? "Yes" : "No"));
+    pendingNote = parts.join("\n");
 
-  const full = checklist != null && checklist.sweep && checklist.ifvg && checklist.valid &&
-               checklist.target && checklist.pd && checklist.momentum;
-  if (full && (confidence == null || confidence >= 8) && (grade == null || grade === "A+" || grade === "A"))
-    return { message: "A+ execution — full checklist, high conviction, clean setup.", severity: "good" };
+    // Save confidence
+    if (confTouched) pendingConfidence = parseInt(document.getElementById("nq-confidence").value);
 
-  return { message: "Valid trade execution.", severity: "info" };
-}
+    document.getElementById("note-panel").classList.remove("open");
+    document.getElementById("note-overlay").classList.remove("open");
+    updateNoteTrigger();
+  }
 
-function renderTradeAnalysis(trade) {
-  const { message, severity } = analyzeTrade(trade);
-  const S = {
-    warning: { border: "#ffa726", text: "#e53935", label: "Warning" },
-    good:    { border: "#4caf50", text: "#4caf50", label: "Good"    },
-    info:    { border: "#42a5f5", text: "#42a5f5", label: "Info"    }
-  };
-  const { border, text, label } = S[severity] || S.info;
-  return `
-    <div class="ai-card" style="background:#1a0a0c;border-color:${border};">
-      <span class="ai-severity-label" style="color:${border};">${label}</span>
-      <span style="color:${text};">${message}</span>
-    </div>`;
-}
+  const pendingNoteData = { reason: "", analysis: "", rules: "", mindset: "", feeling: "" };
 
-// ════════════════════════════════════════════════════════════════
-//  Mistake Detection
-// ════════════════════════════════════════════════════════════════
-function detectMistakes(t) {
-  const mistakes = [];
-  const cl = t.checklist || {};
+  function updateNoteTrigger() {
+    const trigger  = document.getElementById("note-trigger");
+    const label    = document.getElementById("note-trigger-label");
+    const preview  = document.getElementById("note-trigger-preview");
+    const icon     = trigger.querySelector(".note-trigger-icon");
+    const clearBtn = document.getElementById("note-clear-btn");
+    const hasContent = pendingNote.trim() || pendingConfidence !== null;
+    if (hasContent) {
+      trigger.classList.add("has-note");
+      label.textContent = "Edit Note";
+      icon.textContent = "✎";
+      const lines = [];
+      if (pendingNote.trim()) lines.push(pendingNote.trim().split("\n")[0]);
+      if (pendingConfidence !== null) lines.push("Confidence: " + pendingConfidence + "/10");
+      preview.textContent = lines.slice(0, 2).join(" · ");
+      clearBtn.style.display = "inline";
+    } else {
+      trigger.classList.remove("has-note");
+      label.textContent = "Add Note";
+      icon.textContent = "+";
+      preview.textContent = "";
+      clearBtn.style.display = "none";
+    }
+  }
 
-  if (cl.sweep === false)
-    mistakes.push("Entered without BSL/SSL sweep — Rule #1 violated");
+  function clearNote() {
+    pendingNote = "";
+    pendingConfidence = null;
+    pendingYN = null;
+    confTouched = false;
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    updateNoteTrigger();
+  }
 
-  if (cl.ifvg === false)
-    mistakes.push("IFVG not identified before entry");
+  // ── Setup grade (based on iFVG strategy) ──
+  // Rule #1: BSL/SSL must be swept. No sweep = C (forced trade)
+  function calcGrade(c) {
+    const { sweep, ifvg, valid, target, pd, momentum } = c;
+    if (sweep && ifvg && momentum && valid && target && pd) return "A+";
+    if (sweep && ifvg && valid && target && pd)             return "A";
+    if (sweep && ifvg && valid && target)                   return "A-";
+    if (sweep && ifvg && target)                            return "B+";
+    if (sweep && target)                                    return "B";
+    if (sweep)                                              return "B-";
+    return "C";
+  }
 
-  if (cl.valid === false)
-    mistakes.push("Entry invalid — internal high/low already taken");
+  function gradeColor(g) {
+    if (g === "A+") return "#4caf50";
+    if (g === "A")  return "#66bb6a";
+    if (g === "A-") return "#8bc34a";
+    if (g === "B+") return "#ffa726";
+    if (g === "B")  return "#ff7043";
+    if (g === "B-") return "#e53935";
+    return "#b71c1c";
+  }
 
-  if (t.confidence != null && t.confidence <= 4)
-    mistakes.push(`Low confidence (${t.confidence}/10) — high risk entry`);
+  const checkIds = ["c-sweep","c-ifvg","c-valid","c-target","c-pd","c-momentum"];
 
-  if (t.grade && (t.grade === "B-" || t.grade === "C"))
-    mistakes.push(`Below minimum grade (Grade ${t.grade})`);
+  function getChecklist() {
+    return {
+      sweep:    document.getElementById("c-sweep").checked,
+      ifvg:     document.getElementById("c-ifvg").checked,
+      valid:    document.getElementById("c-valid").checked,
+      target:   document.getElementById("c-target").checked,
+      pd:       document.getElementById("c-pd").checked,
+      momentum: document.getElementById("c-momentum").checked,
+    };
+  }
 
-  const notes = (t.notes || "").toLowerCase();
-  if (/forced|fomo|revenge|chasing|emotional/.test(notes))
-    mistakes.push("Emotional/forced trade detected");
+  function updateGradeLive() {
+    const c = getChecklist();
+    const anyChecked = Object.values(c).some(Boolean);
+    const grade = anyChecked ? calcGrade(c) : "—";
+    const badge = document.getElementById("grade-live");
+    badge.textContent = grade;
+    badge.style.color = anyChecked ? gradeColor(grade) : "#555";
+  }
 
-  if (/fomc|trump|news|fed/.test(notes))
-    mistakes.push("High-impact news day trade");
+  checkIds.forEach(id => {
+    document.getElementById(id).addEventListener("change", updateGradeLive);
+  });
 
-  return mistakes;
-}
+  function setTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    const map = { All: 0, Win: 1, Loss: 2, BE: 3 };
+    document.querySelectorAll(".tab")[map[tab]].classList.add("active");
+    renderTrades();
+  }
 
-// ════════════════════════════════════════════════════════════════
-//  Format notes (recognise structured keys from journal)
-// ════════════════════════════════════════════════════════════════
-function formatNotes(raw) {
-  if (!raw || !raw.trim()) return "";
-  const labelMap = [
-    { key: "Why I entered",         display: "Why did you enter this trade?" },
-    { key: "Aligned with analysis", display: "Was the trade aligned with analysis?" },
-    { key: "Rules followed",        display: "Were your rules followed?" },
-    { key: "Mindset",               display: "What was your mindset?" },
-    { key: "Feeling",               display: "How did you feel?" },
-    { key: "Would take again",      display: "Would you take it again?" },
-  ];
-  return raw.split("\n").map(line => {
-    for (const { key, display } of labelMap) {
-      if (line.startsWith(key + ": ")) {
-        const val = line.slice(key.length + 2);
-        return `<span class="note-line-label">${display}</span><span class="note-line-val">${val}</span>`;
+  function processImageFile(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        const maxW = 1200;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        pendingImage = canvas.toDataURL("image/jpeg", 0.8);
+        document.getElementById("preview-img").src = pendingImage;
+        document.getElementById("preview").style.display = "block";
+        document.getElementById("file-label-text").textContent = "📎 " + (file.name || "pasted image");
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Click to pick file
+  document.getElementById("image").addEventListener("change", function () {
+    processImageFile(this.files[0]);
+  });
+
+  // Drag & drop
+  const dropZone = document.querySelector(".file-label");
+  dropZone.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    this.classList.add("drag-over");
+  });
+  dropZone.addEventListener("dragleave", function () {
+    this.classList.remove("drag-over");
+  });
+  dropZone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    this.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    processImageFile(file);
+  });
+
+  // Paste (Ctrl+V anywhere on page)
+  document.addEventListener("paste", function (e) {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        processImageFile(item.getAsFile());
+        break;
       }
     }
-    return `<span class="note-line-val">${line}</span>`;
-  }).join("");
-}
+  });
 
-// ════════════════════════════════════════════════════════════════
-//  Pattern Context
-// ════════════════════════════════════════════════════════════════
-function buildPatternContext(trade, allTrades) {
-  const lines = [];
+  function renderTrades() {
+    const container = document.getElementById("trades");
+    container.innerHTML = "";
 
-  // Pair context
-  if (trade.pair) {
-    const pairTrades = allTrades.filter(t => t.pair === trade.pair);
-    const pairWins   = pairTrades.filter(t => t.result === "Win").length;
-    const pairLosses = pairTrades.filter(t => t.result === "Loss").length;
-    const wlDenom    = pairWins + pairLosses;
-    const pairWR     = wlDenom > 0 ? Math.round((pairWins / wlDenom) * 100) : null;
-    const wrStr      = pairWR !== null ? `${pairWR}% win rate` : "no W/L data";
-    lines.push({ label: `${trade.pair} — ${pairTrades.length} total trades`, value: wrStr });
+    const filtered = activeTab === "All" ? trades : trades.filter(t => t.result === activeTab);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<p style="color:#aaa;font-size:14px;">No ${activeTab === "All" ? "" : activeTab + " "}trades yet.</p>`;
+      return;
+    }
+
+    const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
+
+    [...filtered].reverse().forEach((t) => {
+      const index = trades.indexOf(t);
+      const colorClass = t.result === "Win" ? "win-trade" : t.result === "Loss" ? "loss-trade" : "be-trade";
+      const imgHTML = t.image
+        ? `<img src="${t.image}" alt="chart" onclick="openLightbox(${index})">`
+        : "";
+      const color = resultColor[t.result] || "white";
+
+      const conf = t.confidence;
+      const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
+      const confLabel = conf ? `${conf}/10` : "—/10";
+
+      const clChecked = t.checklist ? ["sweep","ifvg","valid","target","pd","momentum"].filter(k => t.checklist[k]).length : null;
+      const qs = (clChecked !== null || t.confidence)
+        ? Math.round(((clChecked || 0) / 6) * 6 + ((t.confidence || 0) / 10) * 4)
+        : null;
+      const qsCol = qs !== null ? (qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935") : "#555";
+      const qsHTML = qs !== null ? ` &nbsp;|&nbsp; QS: <span style="color:${qsCol};font-weight:bold;">${qs}/10</span>` : "";
+
+      const gradeHTML = t.grade
+        ? `<span style="color:${gradeColor(t.grade)};font-weight:bold;font-size:12px;background:#1a0a0c;padding:1px 7px;border-radius:4px;margin-left:6px;">${t.grade}</span>`
+        : "";
+      const typeHTML = t.tradeType
+        ? `<span style="font-size:10px;color:#888;margin-left:6px;">${t.tradeType}</span>`
+        : "";
+
+      const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+      const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
+      const checklistHTML = t.checklist
+        ? `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px;">` +
+          clKeys.map((k,i) =>
+            `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${t.checklist[k]?"#1b4d1e":"#2b1015"};color:${t.checklist[k]?"#81c784":"#555"};">${t.checklist[k]?"✓":"✗"} ${clLabels[i]}</span>`
+          ).join("") + `</div>`
+        : "";
+
+      container.innerHTML += `
+        <div class="trade ${colorClass}" onclick="openDetailPanel(${index})">
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteTrade(${index})">✕</button>
+          <div class="trade-date">${t.datetime || "No date"}</div>
+          <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
+          RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;">${confLabel}</span>${qsHTML}
+          ${checklistHTML}
+          <div style="margin-top:8px;">${t.notes}</div>
+          ${imgHTML}
+        </div>
+      `;
+    });
   }
 
-  // Confidence context
-  if (trade.confidence != null) {
-    const confTrades = allTrades.filter(t => t.confidence === trade.confidence);
-    lines.push({ label: `Confidence ${trade.confidence}/10`, value: `${confTrades.length} trades at this level` });
-  }
+  function openDetailPanel(index) {
+    const t = trades[index];
+    if (!t) return;
 
-  // Grade context
-  if (trade.grade) {
-    const gradeTrades = allTrades.filter(t => t.grade === trade.grade);
-    const gradeWins   = gradeTrades.filter(t => t.result === "Win").length;
-    const gradeLosses = gradeTrades.filter(t => t.result === "Loss").length;
-    const gwDenom     = gradeWins + gradeLosses;
-    const gradeWR     = gwDenom > 0 ? Math.round((gradeWins / gwDenom) * 100) + "% WR" : "no W/L data";
-    lines.push({ label: `Grade ${trade.grade} — ${gradeTrades.length} trades`, value: gradeWR });
-  }
+    const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
+    const color = resultColor[t.result] || "white";
+    const conf = t.confidence;
+    const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
+    const clChecked = t.checklist ? ["sweep","ifvg","valid","target","pd","momentum"].filter(k => t.checklist[k]).length : null;
+    const qs = (clChecked !== null || t.confidence)
+      ? Math.round(((clChecked || 0) / 6) * 6 + ((t.confidence || 0) / 10) * 4)
+      : null;
+    const qsCol = qs !== null ? (qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935") : "#555";
+    const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+    const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
 
-  return lines;
-}
+    document.getElementById("detail-title").innerHTML =
+      `<strong>${t.pair}</strong> &nbsp;<span style="color:${color}">${t.result}</span>` +
+      (t.grade ? ` &nbsp;<span style="color:${gradeColor(t.grade)};font-size:14px;background:#2b0f14;padding:2px 9px;border-radius:5px;">${t.grade}</span>` : "");
+    document.getElementById("detail-subtitle").textContent =
+      (t.datetime || "") + (t.tradeType ? " · " + t.tradeType : "");
 
-// ════════════════════════════════════════════════════════════════
-//  Render full analysis panel
-// ════════════════════════════════════════════════════════════════
-function renderAnalysis(trade, allTrades) {
-  const rColor = resultColor(trade.result);
-  const cConf  = confColor(trade.confidence);
-  const qs     = qualityScore(trade);
-  const qsCol  = qs !== null ? (qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935") : "#555";
+    const clHTML = t.checklist
+      ? `<div class="detail-section-title">Checklist</div>
+         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">` +
+        clKeys.map((k,i) =>
+          `<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${t.checklist[k]?"#1b4d1e":"#2b1015"};color:${t.checklist[k]?"#81c784":"#666"};">${t.checklist[k]?"✓":"✗"} ${clLabels[i]}</span>`
+        ).join("") + `</div>`
+      : "";
 
-  const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
-  const clLabels = ["BSL/SSL Swept","IFVG Identified","Valid Entry","Clear DOL","Correct P/D","No Chop"];
-
-  // ── 1. Header ──
-  const headerHTML = `
-    <div class="analysis-header">
-      <span class="ah-pair">${trade.pair || "—"}</span>
-      <span class="ah-result" style="color:${rColor};">${trade.result || "—"}</span>
-      ${trade.grade
-        ? `<span class="ah-grade" style="color:${gradeColor(trade.grade)};">${trade.grade}</span>`
-        : ""}
-      ${trade.tradeType
-        ? `<span class="ah-type">${trade.tradeType}</span>`
-        : ""}
-      <span class="ah-date">${trade.datetime || ""}</span>
-    </div>`;
-
-  // ── 2. Stats row ──
-  const statsHTML = `
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-label">RR</div>
-        <div class="stat-value">${trade.rr || "—"}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Confidence</div>
-        <div class="stat-value" style="color:${cConf};">${trade.confidence != null ? trade.confidence + "/10" : "—"}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Quality Score</div>
-        <div class="stat-value" style="color:${qsCol};">${qs !== null ? qs + "/10" : "—"}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Grade</div>
-        <div class="stat-value" style="color:${trade.grade ? gradeColor(trade.grade) : "#555"};">${trade.grade || "—"}</div>
-      </div>
-    </div>`;
-
-  // ── 3. AI Analysis ──
-  const aiHTML = `
-    <div class="section-card">
-      <div class="section-title">AI Analysis</div>
-      ${renderTradeAnalysis(trade)}
-    </div>`;
-
-  // ── 4. Checklist breakdown ──
-  const hasCL = !!trade.checklist;
-  const checklistItemsHTML = hasCL
-    ? clKeys.map((k, i) => {
-        const pass = !!trade.checklist[k];
-        return `<div class="cl-item ${pass ? "pass" : "fail"}">
-          <span class="cl-icon">${pass ? "✓" : "✗"}</span>
-          <span>${clLabels[i]}</span>
-        </div>`;
-      }).join("")
-    : `<span style="color:#666;font-size:13px;">No checklist data recorded for this trade.</span>`;
-
-  const checklistHTML = `
-    <div class="section-card">
-      <div class="section-title">Checklist Breakdown</div>
-      <div class="checklist-grid">${checklistItemsHTML}</div>
-    </div>`;
-
-  // ── 5. Mistake Detection ──
-  const mistakes = detectMistakes(trade);
-  const mistakesHTML = `
-    <div class="section-card">
-      <div class="section-title">Mistake Detection</div>
-      <div class="mistakes-list">
-        ${mistakes.length === 0
-          ? `<div class="no-violations">No violations detected — clean execution.</div>`
-          : mistakes.map(m => `<div class="mistake-badge">${m}</div>`).join("")
+    const formatNotes = (raw) => {
+      const labelMap = [
+        { key: "Why I entered",         display: "Why did you enter this trade?" },
+        { key: "Aligned with analysis", display: "Was the trade aligned with analysis?" },
+        { key: "Rules followed",        display: "Were your rules followed?" },
+        { key: "Mindset",               display: "What was your mindset coming into the market?" },
+        { key: "Feeling",               display: "How did you feel during the trade?" },
+        { key: "Would take again",      display: "Would you take it again?" },
+      ];
+      return raw.split("\n").map(line => {
+        for (const { key, display } of labelMap) {
+          if (line.startsWith(key + ": ")) {
+            const val = line.slice(key.length + 2);
+            return `<div style="margin-bottom:10px;"><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#aaa;font-weight:bold;">${display}</span><br><span style="font-size:14px;color:#ddd;">${val}</span></div>`;
+          }
         }
-      </div>
-    </div>`;
+        return `<span style="font-size:14px;color:#ddd;">${line}</span>`;
+      }).join("");
+    };
 
-  // ── 6. Chart Image ──
-  const imageHTML = trade.image
-    ? `<div class="section-card">
-        <div class="section-title">Chart</div>
-        <img class="chart-img" src="${trade.image}" alt="chart" onclick="openLightbox('${trade.image}')">
-      </div>`
-    : "";
-
-  // ── 7. Trade Notes ──
-  const notesHTML = trade.notes && trade.notes.trim()
-    ? `<div class="section-card">
-        <div class="section-title">Trade Notes</div>
-        <div class="notes-content">${formatNotes(trade.notes)}</div>
-      </div>`
-    : "";
-
-  // ── 8. Pattern Context ──
-  const contextLines = buildPatternContext(trade, allTrades);
-  const contextHTML = contextLines.length > 0
-    ? `<div class="section-card">
-        <div class="section-title">Pattern Context</div>
-        <div class="pattern-lines">
-          ${contextLines.map(l => `
-            <div class="pattern-line">
-              <span>${l.label}</span>
-              <span class="pattern-val">${l.value}</span>
-            </div>`).join("")}
-        </div>
-      </div>`
-    : "";
-
-  return headerHTML + statsHTML + aiHTML + checklistHTML + mistakesHTML + imageHTML + notesHTML + contextHTML;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  Trade selector cards
-// ════════════════════════════════════════════════════════════════
-let trades = [];
-let selectedIndex = null;
-
-function loadTrades() {
-  try {
-    trades = JSON.parse(localStorage.getItem("trades")) || [];
-  } catch(e) {
-    trades = [];
-  }
-}
-
-function renderSelector() {
-  const grid = document.getElementById("trade-grid");
-  grid.innerHTML = "";
-
-  if (trades.length === 0) {
-    grid.innerHTML = `<div class="no-trades-msg" style="grid-column:1/-1;">No trades found. Add trades in the Journal first.</div>`;
-    return;
-  }
-
-  // Show newest first
-  [...trades].reverse().forEach((t, revIdx) => {
-    const origIdx = trades.length - 1 - revIdx;
-    const rColor  = resultColor(t.result);
-    const cColor  = confColor(t.confidence);
-    const colorClass = t.result === "Win" ? "win-card" : t.result === "Loss" ? "loss-card" : "be-card";
-
-    const gradeSpan = t.grade
-      ? `<span class="tc-grade" style="color:${gradeColor(t.grade)};">${t.grade}</span>`
-      : "";
-    const confSpan = t.confidence != null
-      ? `<span class="tc-conf" style="color:${cColor};">${t.confidence}/10</span>`
+    const notesHTML = t.notes
+      ? `<div class="detail-section-title">Notes</div>
+         <div class="detail-notes" style="background:#2b0f14;border-radius:7px;padding:14px 16px;">${formatNotes(t.notes)}</div>`
       : "";
 
-    const card = document.createElement("div");
-    card.className = `trade-card ${colorClass}${selectedIndex === origIdx ? " selected" : ""}`;
-    card.dataset.index = origIdx;
-    card.innerHTML = `
-      <div>
-        <div class="tc-date">${t.datetime || "No date"}</div>
-        <div style="display:flex;align-items:center;gap:7px;margin-top:3px;">
-          <span class="tc-pair">${t.pair || "—"}</span>
-          <span class="tc-result" style="color:${rColor};">${t.result || "—"}</span>
+    const imgHTML = t.image
+      ? `<img class="detail-img" src="${t.image}" alt="chart" onclick="openLightbox(${index})">`
+      : "";
+
+    document.getElementById("detail-body").innerHTML = `
+      <div class="detail-row">
+        <div class="detail-stat">
+          <div class="detail-stat-label">RR</div>
+          <div class="detail-stat-value">${t.rr || "—"}</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-label">Confidence</div>
+          <div class="detail-stat-value" style="color:${confColor}">${conf ? conf + "/10" : "—"}</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-label">Quality Score</div>
+          <div class="detail-stat-value" style="color:${qsCol}">${qs !== null ? qs + "/10" : "—"}</div>
         </div>
       </div>
-      <div class="tc-meta">
-        ${gradeSpan}
-        ${confSpan}
-        ${t.rr ? `<span style="color:#888;">RR ${t.rr}</span>` : ""}
-      </div>`;
+      ${clHTML}
+      ${notesHTML}
+      ${imgHTML}
+      <div style="margin-top:18px;display:flex;gap:8px;">
+        <button onclick="event.stopPropagation(); editDatetime(${index})" style="flex:1;font-size:12px;padding:8px;background:#2b0f14;color:#aaa;border:none;border-radius:6px;cursor:pointer;margin:0;">Edit Date</button>
+        <button onclick="event.stopPropagation(); editConfidenceFromPanel(${index})" style="flex:1;font-size:12px;padding:8px;background:#2b0f14;color:#aaa;border:none;border-radius:6px;cursor:pointer;margin:0;">Edit Confidence</button>
+      </div>
+    `;
 
-    card.addEventListener("click", () => selectTrade(origIdx));
-    grid.appendChild(card);
-  });
-}
-
-function selectTrade(index) {
-  selectedIndex = index;
-
-  // Update card highlight
-  document.querySelectorAll(".trade-card").forEach(c => {
-    c.classList.toggle("selected", parseInt(c.dataset.index) === index);
-  });
-
-  const panel = document.getElementById("analysis-panel");
-  const trade = trades[index];
-  if (!trade) {
-    panel.innerHTML = `<div class="empty-state"><span class="empty-icon">&#x26A0;</span>Trade not found.</div>`;
-    return;
+    document.getElementById("detail-panel").classList.add("open");
+    document.getElementById("detail-overlay").classList.add("open");
   }
 
-  panel.innerHTML = renderAnalysis(trade, trades);
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+  function closeDetailPanel() {
+    document.getElementById("detail-panel").classList.remove("open");
+    document.getElementById("detail-overlay").classList.remove("open");
+  }
 
-// ════════════════════════════════════════════════════════════════
-//  Lightbox
-// ════════════════════════════════════════════════════════════════
-function openLightbox(src) {
-  document.getElementById("lightbox-img").src = src;
-  document.getElementById("lightbox").classList.add("open");
-}
+  function editConfidenceFromPanel(index) {
+    const current = trades[index].confidence || "";
+    const input = prompt("Confidence level (1–10):", current);
+    if (input === null) return;
+    const num = parseInt(input);
+    if (isNaN(num) || num < 1 || num > 10) { alert("Enter a number between 1 and 10."); return; }
+    trades[index].confidence = num;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+    openDetailPanel(index);
+  }
 
-function closeLightbox() {
-  document.getElementById("lightbox").classList.remove("open");
-  document.getElementById("lightbox-img").src = "";
-}
+  function addTrade() {
+    const pair = document.getElementById("pair").value;
+    const result = document.getElementById("result").value;
+    const rr = document.getElementById("rr").value;
 
-document.addEventListener("keydown", function(e) {
-  if (e.key === "Escape") closeLightbox();
-});
+    if (!pair || !result) {
+      alert("Select pair and result");
+      return;
+    }
 
-// ════════════════════════════════════════════════════════════════
-//  Init
-// ════════════════════════════════════════════════════════════════
-loadTrades();
-renderSelector();
-</script>
-</body>
-</html>
+    const now = new Date();
+    const datetime = now.toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true });
+    const tradeType = document.getElementById("tradeType").value || null;
+    const checklist = getChecklist();
+    const grade = Object.values(checklist).some(Boolean) ? calcGrade(checklist) : null;
+    const confidence = pendingConfidence || null;
+    const trade = { pair, result, rr, notes: pendingNote, image: pendingImage, datetime, checklist, grade, tradeType, confidence };
+    trades.push(trade);
+
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+
+    document.getElementById("pair").value = "";
+    document.getElementById("result").value = "";
+    document.getElementById("tradeType").value = "";
+    document.getElementById("rr").value = "";
+    document.getElementById("image").value = "";
+    document.getElementById("preview").style.display = "none";
+    document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
+    // Reset note panel fields
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("nq-confidence").value = 5;
+    document.getElementById("conf-value-display").textContent = "—";
+    document.getElementById("conf-value-label").textContent  = "—";
+    document.getElementById("yn-yes").classList.remove("active");
+    document.getElementById("yn-no").classList.remove("active");
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    pendingImage = null;
+    pendingNote  = "";
+    pendingConfidence = null;
+    pendingYN = null;
+    confTouched = false;
+    updateNoteTrigger();
+    checkIds.forEach(id => { document.getElementById(id).checked = false; });
+    const badge = document.getElementById("grade-live");
+    badge.textContent = "—";
+    badge.style.color = "#555";
+  }
+
+  function editDatetime(index) {
+    const current = trades[index].datetime || "";
+    const input = prompt("Edit date/time:", current);
+    if (input === null) return;
+    trades[index].datetime = input.trim() || current;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+    openDetailPanel(index);
+  }
+
+  function editConfidence(index) {
+    const current = trades[index].confidence || "";
+    const input = prompt("Confidence level (1–10):", current);
+    if (input === null) return;
+    const num = parseInt(input);
+    if (isNaN(num) || num < 1 || num > 10) { alert("Enter a number between 1 and 10."); return; }
+    trades[index].confidence = num;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+  }
+
+  function deleteTrade(index) {
+    trades.splice(index, 1);
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+  }
+
+  function openLightbox(index) {
+    document.getElementById("lightbox-img").src = trades[index].image;
+    document.getElementById("lightbox").classList.add("open");
+  }
+
+  function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("open");
+    document.getElementById("lightbox-img").src = "";
+  }
+
+  // Close lightbox on background click
+  document.getElementById("lightbox").addEventListener("click", function (e) {
+    if (e.target === this) closeLightbox();
+  });
+
+  renderTrades();
+  </script>
+
+
+  </body>
+  </html>
