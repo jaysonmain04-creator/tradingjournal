@@ -1,1553 +1,911 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Trade Analysis</title>
-  <style>
-    * { box-sizing: border-box; }
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Trading Journal</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial;
+        background-color: #401d23;
+        color: white;
+        text-align: center;
+      }
 
-    body {
-      margin: 0;
-      font-family: Arial;
-      background-color: #401d23;
-      color: white;
-      text-align: center;
-    }
+      h1 {
+        margin-top: 40px;
+        font-size: 40px;
+      }
 
-    nav {
-      background: #2b0f14;
-      padding: 12px 0;
-      margin-bottom: 10px;
-      text-align: center;
-    }
+      .box {
+        margin: 40px auto;
+        padding: 20px;
+        max-width: 640px;
+        width: 95%;
+        background: #5a2a31;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.6);
+      }
 
-    nav a {
-      color: white;
-      text-decoration: none;
-      margin: 0 20px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+      .form-columns {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
 
-    nav a:hover { opacity: 1 !important; text-decoration: underline; }
+      .form-left {
+        flex: 1;
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+      }
 
-    h1 {
-      margin-top: 30px;
-      font-size: 40px;
-    }
+      .form-right {
+        flex: 0 0 185px;
+      }
 
-    /* ── Stats cards ── */
-    .stats-row {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 20px 16px 0;
-      max-width: 900px;
-      margin: 0 auto;
-    }
+      input, select {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        border: none;
+        background: #2b0f14;
+        color: white;
+        font-size: 14px;
+        box-sizing: border-box;
+        appearance: none;
+        -webkit-appearance: none;
+      }
 
-    .stat-card {
-      background: #5a2a31;
-      border-radius: 10px;
-      padding: 16px 24px;
-      min-width: 130px;
-      flex: 1;
-      box-shadow: 0 0 12px rgba(0,0,0,0.5);
-    }
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaa'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+      }
 
-    .stat-label {
-      font-size: 11px;
-      color: #aaa;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-    }
+      .file-label {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        background: #2b0f14;
+        color: #aaa;
+        font-size: 14px;
+        box-sizing: border-box;
+        cursor: pointer;
+        text-align: left;
+        border: 2px dashed transparent;
+        transition: border-color 0.15s, background 0.15s;
+      }
 
-    .stat-value {
-      font-size: 32px;
-      font-weight: bold;
-    }
+      .file-label:hover {
+        background: #3a1018;
+      }
 
-    /* ── Patterns section ── */
-    .section {
-      max-width: 700px;
-      margin: 24px auto 0;
-      padding: 0 16px;
-      text-align: left;
-    }
+      .file-label.drag-over {
+        border-color: #8b3a44;
+        background: #3a1018;
+        color: white;
+      }
 
-    .section-title {
-      font-size: 13px;
-      color: #aaa;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
-      text-align: center;
-    }
+      #image {
+        display: none;
+      }
 
-    .insight {
-      background: #5a2a31;
-      border-left: 3px solid #8b3a44;
-      border-radius: 6px;
-      padding: 11px 14px;
-      margin: 8px 0;
-      font-size: 14px;
-      line-height: 1.6;
-    }
+      #preview {
+        display: none;
+        width: 90%;
+        margin: 6px auto 0;
+        border-radius: 5px;
+        overflow: hidden;
+      }
 
-    /* ── Bar chart ── */
-    .bar-group { margin: 10px 0; }
+      #preview img {
+        width: 100%;
+        border-radius: 5px;
+        display: block;
+      }
 
-    .bar-label {
-      font-size: 13px;
-      margin-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-    }
+      button {
+        width: 93%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 5px;
+        border: none;
+        background: #8b3a44;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+      }
 
-    .bar-track {
-      background: #2b0f14;
-      border-radius: 4px;
-      height: 16px;
-      width: 100%;
-      overflow: hidden;
-    }
+      button:hover {
+        background: #a44b55;
+      }
 
-    .bar-fill { height: 100%; border-radius: 4px; }
-    .bar-fill.win  { background: #4caf50; }
-    .bar-fill.loss { background: #e53935; }
-    .bar-fill.be   { background: #42a5f5; }
+      #trades {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 10px 16px 40px;
+        box-sizing: border-box;
+      }
 
-    /* ── Trade list ── */
-    .trade-list {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 10px 16px 40px;
-    }
+      #trades > p {
+        grid-column: 1 / -1;
+        text-align: center;
+      }
 
-    .trade-list > p {
-      grid-column: 1 / -1;
-      text-align: center;
-    }
+      @media (max-width: 1100px) { #trades { grid-template-columns: repeat(3, 1fr); } }
+      @media (max-width: 760px)  { #trades { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 480px)  { #trades { grid-template-columns: 1fr; } }
 
-    @media (max-width: 1100px) { .trade-list { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 760px)  { .trade-list { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 480px)  { .trade-list { grid-template-columns: 1fr; } }
+      .trade {
+        background: #2b0f14;
+        margin: 0;
+        padding: 12px 16px;
+        width: auto;
+        border-radius: 8px;
+        position: relative;
+        box-sizing: border-box;
+        text-align: left;
+        line-height: 1.5;
+        height: 200px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
 
-    .trade {
-      background: #2b0f14;
-      margin: 0;
-      padding: 12px 16px;
-      border-radius: 8px;
-      position: relative;
-      text-align: left;
-      line-height: 1.5;
-      height: 200px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
+      .trade:hover { background: #351319; }
 
-    .trade:hover { background: #351319; }
+      .trade::after {
+        content: "";
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 56px;
+        background: linear-gradient(transparent, #2b0f14);
+        pointer-events: none;
+        transition: background 0.15s;
+      }
 
-    .trade::after {
-      content: "";
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 56px;
-      background: linear-gradient(transparent, #2b0f14);
-      pointer-events: none;
-      transition: background 0.15s;
-    }
+      .trade:hover::after { background: linear-gradient(transparent, #351319); }
 
-    .trade:hover::after { background: linear-gradient(transparent, #351319); }
+      .trade img {
+        width: 100%;
+        border-radius: 5px;
+        margin-top: 8px;
+        display: block;
+        cursor: pointer;
+      }
 
-    /* ── Trade detail panel ── */
-    #detail-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 1000;
-    }
-    #detail-overlay.open { display: block; }
+      /* ── Trade detail panel ── */
+      #detail-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+      }
+      #detail-overlay.open { display: block; }
 
-    #detail-panel {
-      position: fixed;
-      top: 0;
-      right: -560px;
-      width: 540px;
-      height: 100%;
-      background: #1e0d10;
-      z-index: 1001;
-      display: flex;
-      flex-direction: column;
-      transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
-      box-shadow: -4px 0 24px rgba(0,0,0,0.6);
-    }
-    #detail-panel.open { right: 0; }
+      #detail-panel {
+        position: fixed;
+        top: 0;
+        right: -560px;
+        width: 540px;
+        height: 100%;
+        background: #1e0d10;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -4px 0 24px rgba(0,0,0,0.6);
+      }
+      #detail-panel.open { right: 0; }
 
-    .detail-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 24px;
-      border-bottom: 1px solid #3a1018;
-      flex-shrink: 0;
-    }
-    .detail-header-left { text-align: left; }
-    .detail-title { font-size: 18px; font-weight: bold; color: white; }
-    .detail-subtitle { font-size: 12px; color: #888; margin-top: 2px; }
-    .detail-close {
-      background: #3a1018;
-      color: #aaa;
-      border: none;
-      border-radius: 6px;
-      padding: 7px 14px;
-      font-size: 18px;
-      cursor: pointer;
-      width: auto;
-      margin: 0;
-      line-height: 1;
-    }
-    .detail-close:hover { background: #5a2a31; color: white; }
+      .detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #3a1018;
+        flex-shrink: 0;
+      }
+      .detail-header-left { text-align: left; }
+      .detail-title { font-size: 18px; font-weight: bold; color: white; }
+      .detail-subtitle { font-size: 12px; color: #888; margin-top: 2px; }
+      .detail-close {
+        background: #3a1018;
+        color: #aaa;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 14px;
+        font-size: 18px;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+        line-height: 1;
+      }
+      .detail-close:hover { background: #5a2a31; color: white; }
 
-    .detail-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 24px 30px;
-    }
-    .detail-body::-webkit-scrollbar { width: 5px; }
-    .detail-body::-webkit-scrollbar-track { background: transparent; }
-    .detail-body::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
+      .detail-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px 30px;
+      }
+      .detail-body::-webkit-scrollbar { width: 5px; }
+      .detail-body::-webkit-scrollbar-track { background: transparent; }
+      .detail-body::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
 
-    .detail-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-    .detail-stat {
-      background: #2b0f14;
-      border-radius: 7px;
-      padding: 10px 16px;
-      flex: 1;
-      min-width: 80px;
-      text-align: left;
-    }
-    .detail-stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-    .detail-stat-value { font-size: 18px; font-weight: bold; }
+      .detail-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .detail-stat {
+        background: #2b0f14;
+        border-radius: 7px;
+        padding: 10px 16px;
+        flex: 1;
+        min-width: 80px;
+        text-align: left;
+      }
+      .detail-stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+      .detail-stat-value { font-size: 18px; font-weight: bold; }
 
-    .detail-section-title {
-      font-size: 10px;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin: 18px 0 8px;
-    }
+      .detail-section-title {
+        font-size: 10px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 18px 0 8px;
+      }
 
-    .detail-notes {
-      background: #2b0f14;
-      border-radius: 7px;
-      padding: 14px 16px;
-      line-height: 1.6;
-    }
+      .detail-notes {
+        background: #2b0f14;
+        border-radius: 7px;
+        padding: 14px 16px;
+        line-height: 1.6;
+      }
 
-    .detail-img {
-      width: 100%;
-      border-radius: 7px;
-      margin-top: 14px;
-      display: block;
-      cursor: pointer;
-    }
+      .detail-img {
+        width: 100%;
+        border-radius: 7px;
+        margin-top: 14px;
+        display: block;
+        cursor: pointer;
+      }
 
-    @media (max-width: 560px) { #detail-panel { width: 100%; right: -100%; } }
+      @media (max-width: 560px) {
+        #detail-panel { width: 100%; right: -100%; }
+      }
 
-    .journal-tabs {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin: 16px auto 12px;
-    }
+      .delete-btn {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        width: auto;
+        padding: 2px 7px;
+        margin: 0;
+        background: #6b1a22;
+        font-size: 12px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
 
-    .jtab {
-      padding: 6px 18px;
-      border-radius: 20px;
-      border: none;
-      font-size: 13px;
-      font-weight: bold;
-      background: #2b0f14;
-      color: #aaa;
-      cursor: pointer;
-      width: auto;
-      margin: 0;
-    }
+      .delete-btn:hover {
+        background: #c0392b;
+      }
 
-    .jtab:hover { background: #3a1018; color: #ccc; }
-    .jtab.active { background: #5a2a31; color: white; }
+      .tabs {
+        margin: 10px auto 4px;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
 
-    .pattern-split {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      justify-content: center;
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 0 16px;
-    }
+      .tab {
+        width: auto;
+        padding: 7px 20px;
+        margin: 0;
+        border-radius: 20px;
+        font-size: 13px;
+        background: #2b0f14;
+        color: #aaa;
+        font-weight: bold;
+      }
 
-    .pattern-col {
-      flex: 1;
-      min-width: 260px;
-      text-align: left;
-    }
+      .tab:hover { background: #3a1018; color: #ccc; }
 
-    .pattern-col-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-weight: bold;
-      margin-bottom: 8px;
-      text-align: center;
-    }
+      .tab.active { background: #5a2a31; color: #ffffff; }
 
-    .trade.win-trade  { border-left: 3px solid #4caf50; }
-    .trade.loss-trade { border-left: 3px solid #e53935; }
-    .trade.be-trade   { border-left: 3px solid #42a5f5; }
+      .trade.win-trade  { border-left: 3px solid #4caf50; }
+      .trade.loss-trade { border-left: 3px solid #e53935; }
+      .trade.be-trade   { border-left: 3px solid #42a5f5; }
 
-    .trade img {
-      width: 100%;
-      border-radius: 5px;
-      margin-top: 8px;
-      display: block;
-      cursor: pointer;
-    }
+      .trade-date {
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 4px;
+        cursor: pointer;
+        text-align: left;
+      }
 
-    .trade-date {
-      font-size: 11px;
-      color: #888;
-      margin-bottom: 4px;
-    }
+      .trade-date:hover {
+        color: #bbb;
+        text-decoration: underline;
+      }
 
-    .win-text  { color: #4caf50; font-weight: bold; }
-    .loss-text { color: #e53935; font-weight: bold; }
-    .be-text   { color: #42a5f5; font-weight: bold; }
+      /* Lightbox */
+      #lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 999;
+        justify-content: center;
+        align-items: center;
+      }
 
-    .divider {
-      border: none;
-      border-top: 1px solid #5a2a31;
-      margin: 28px auto;
-      max-width: 500px;
-    }
+      #lightbox.open {
+        display: flex;
+      }
 
-    .empty {
-      color: #aaa;
-      margin-top: 60px;
-      font-size: 16px;
-    }
+      #lightbox img {
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 8px;
+      }
 
-    /* ── Word cloud ── */
-    .word-cloud {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      padding: 10px 0;
-    }
+      #lightbox-close {
+        position: fixed;
+        top: 16px;
+        right: 20px;
+        font-size: 28px;
+        cursor: pointer;
+        color: white;
+        font-weight: bold;
+        background: none;
+        border: none;
+        width: auto;
+        padding: 0;
+      }
 
-    .word-tag {
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-weight: bold;
-      cursor: default;
-      transition: opacity 0.2s;
-    }
+      .checklist-box {
+        width: 100%;
+        margin: 0;
+        background: #2b0f14;
+        border-radius: 5px;
+        padding: 10px 12px;
+        text-align: left;
+        box-sizing: border-box;
+      }
 
-    .word-tag:hover { opacity: 0.8; }
+      .checklist-header {
+        font-size: 11px;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-    .word-cols {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #ccc;
+        padding: 4px 0;
+        cursor: pointer;
+        user-select: none;
+      }
 
-    .word-col {
-      flex: 1;
-      min-width: 200px;
-      background: #5a2a31;
-      border-radius: 10px;
-      padding: 16px;
-    }
+      .check-item input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        min-width: 15px;
+        accent-color: #8b3a44;
+        cursor: pointer;
+        margin: 0;
+        appearance: auto;
+        -webkit-appearance: auto;
+      }
 
-    .word-col-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      font-weight: bold;
-    }
+      /* ── Note trigger button ── */
+      .note-trigger {
+        width: 100%;
+        padding: 10px 12px;
+        margin: 5px 0;
+        border-radius: 5px;
+        background: #2b0f14;
+        border: 1.5px dashed #4a1e24;
+        color: #888;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        transition: border-color 0.15s, background 0.15s;
+        box-sizing: border-box;
+        font-family: Arial;
+        line-height: 1.4;
+        min-height: 42px;
+      }
+      .note-trigger:hover { border-color: #8b3a44; background: #331218; color: #bbb; }
+      .note-trigger.has-note { border-style: solid; border-color: #5a2a31; color: #ccc; }
+      .note-trigger-icon { font-size: 16px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+      .note-trigger-text { flex: 1; }
+      .note-trigger-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+      .note-trigger-preview { font-size: 13px; color: #ccc; white-space: pre-line; }
 
-    /* Lightbox */
-    #lightbox {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.85);
-      z-index: 999;
-      justify-content: center;
-      align-items: center;
-    }
-    #lightbox.open { display: flex; }
-    #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
-    #lightbox-close {
-      position: fixed; top: 16px; right: 20px;
-      font-size: 28px; cursor: pointer; color: white;
-      font-weight: bold; background: none; border: none;
-    }
+      /* ── Note panel overlay ── */
+      #note-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+      }
+      #note-overlay.open { display: block; }
 
-  </style>
-</head>
-<body>
+      /* ── Note panel ── */
+      #note-panel {
+        position: fixed;
+        top: 0;
+        right: -510px;
+        width: 490px;
+        height: 100%;
+        background: #1e0d10;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -4px 0 24px rgba(0,0,0,0.6);
+      }
+      #note-panel.open { right: 0; }
 
-<nav>
-  <a href="index.html" style="opacity:0.4;">Journal</a>
-  <a href="analysis.html">Analysis</a>
-  <a href="replay.html" style="opacity:0.4;">Replay</a>
-</nav>
+      .note-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #3a1018;
+        flex-shrink: 0;
+      }
+      .note-panel-title {
+        font-size: 13px;
+        font-weight: bold;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .note-panel-done {
+        background: #8b3a44;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 20px;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+      }
+      .note-panel-done:hover { background: #a44b55; }
 
-<h1>Analysis</h1>
+      .note-doc {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px 30px;
+      }
+      .note-doc::-webkit-scrollbar { width: 5px; }
+      .note-doc::-webkit-scrollbar-track { background: transparent; }
+      .note-doc::-webkit-scrollbar-thumb { background: #3a1018; border-radius: 3px; }
 
-<div id="content"></div>
+      .note-q {
+        margin-bottom: 20px;
+      }
+      .note-q-label {
+        font-size: 11px;
+        color: #ffffff;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 7px;
+        display: block;
+      }
+      .note-q textarea {
+        width: 100%;
+        background: #160a0c;
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 7px;
+        color: #ffffff;
+        font-size: 14px;
+        font-family: Georgia, serif;
+        line-height: 1.65;
+        padding: 12px 14px;
+        resize: none;
+        outline: none;
+        box-sizing: border-box;
+        caret-color: #e07080;
+        overflow: hidden;
+        min-height: 52px;
+        transition: border-color 0.15s;
+      }
+      .note-q textarea:focus { border-color: rgba(255,255,255,0.6); }
+      .note-q textarea::placeholder { color: rgba(255,255,255,0.25); font-style: italic; }
 
-<!-- Trade detail panel -->
-<div id="detail-overlay" onclick="closeDetailPanel()"></div>
-<div id="detail-panel">
-  <div class="detail-header">
-    <div class="detail-header-left">
-      <div class="detail-title" id="detail-title">—</div>
-      <div class="detail-subtitle" id="detail-subtitle">—</div>
+      /* Yes / No toggle */
+      .yn-row {
+        display: flex;
+        gap: 8px;
+      }
+      .yn-btn {
+        flex: 1;
+        padding: 9px 0;
+        border-radius: 6px;
+        border: 1.5px solid rgba(255,255,255,0.25);
+        background: #160a0c;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        width: auto;
+        margin: 0;
+        transition: all 0.15s;
+      }
+      .yn-btn:hover { border-color: rgba(255,255,255,0.6); color: #fff; background: #1e0d10; }
+      .yn-btn.yn-yes.active { background: #1b3a1e; border-color: #4caf50; color: #4caf50; }
+      .yn-btn.yn-no.active  { background: #3a1018; border-color: #e53935; color: #e53935; }
+
+      /* Confidence slider */
+      .conf-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .conf-row input[type="range"] {
+        flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        background: #2e1015;
+        outline: none;
+        padding: 0;
+        margin: 0;
+        border: none;
+        width: auto;
+      }
+      .conf-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #8b3a44;
+        cursor: pointer;
+      }
+      .conf-value {
+        font-size: 20px;
+        font-weight: bold;
+        min-width: 36px;
+        text-align: right;
+        color: #ccc;
+      }
+      .conf-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: rgba(255,255,255,0.4);
+        margin-top: 4px;
+      }
+
+      @media (max-width: 520px) {
+        #note-panel { width: 100%; right: -100%; }
+      }
+
+      nav {
+        background: #2b0f14;
+        padding: 12px 0;
+        margin-bottom: 0;
+        text-align: center;
+      }
+      nav a {
+        color: white;
+        text-decoration: none;
+        margin: 0 20px;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      nav a:hover { opacity: 1 !important; text-decoration: underline; }
+
+    </style>
+  </head>
+  <body>
+
+  <nav>
+    <a href="index.html">Journal</a>
+    <a href="analysis.html" style="opacity:0.4;">Analysis</a>
+    <a href="replay.html" style="opacity:0.4;">Replay</a>
+  </nav>
+
+  <h1>Trading Journal</h1>
+
+  <div class="box">
+    <div class="form-columns">
+      <div class="form-left">
+        <select id="pair">
+          <option value="">Select Pair</option>
+          <option value="NQ">NQ</option>
+          <option value="ES">ES</option>
+          <option value="MNQ">MNQ</option>
+        </select>
+
+        <select id="result">
+          <option value="">Select Result</option>
+          <option value="Win">Win</option>
+          <option value="Loss">Loss</option>
+          <option value="BE">BE</option>
+        </select>
+
+        <select id="tradeType">
+          <option value="">Trade Type</option>
+          <option value="Reversal">Reversal</option>
+          <option value="Continuation">Continuation</option>
+        </select>
+
+        <input id="rr" placeholder="RR (e.g. 1:2)">
+
+        <button type="button" class="note-trigger" id="note-trigger" onclick="openNotePanel()">
+          <span class="note-trigger-icon">+</span>
+          <span class="note-trigger-text">
+            <div class="note-trigger-label" id="note-trigger-label">Add Note</div>
+            <div class="note-trigger-preview" id="note-trigger-preview"></div>
+          </span>
+          <span id="note-clear-btn" onclick="event.stopPropagation(); clearNote()" title="Remove note"
+                style="display:none; font-size:15px; color:#888; padding:2px 6px; line-height:1; cursor:pointer; border-radius:3px; transition:color 0.15s;"
+                onmouseover="this.style.color='#e06070'" onmouseout="this.style.color='#888'">✕</span>
+        </button>
+
+        <label class="file-label" for="image" id="file-label-text">📎 Click, drag & drop, or paste (Ctrl+V)</label>
+        <input type="file" id="image" accept="image/*">
+        <div id="preview"><img id="preview-img" src="" alt="preview"></div>
+      </div>
+
+      <div class="form-right">
+        <div class="checklist-box">
+          <div class="checklist-header">
+            Checklist
+            <span id="grade-live" style="font-weight:bold;font-size:14px;color:#555;">—</span>
+          </div>
+          <label class="check-item"><input type="checkbox" id="c-sweep"> BSL/SSL Swept</label>
+          <label class="check-item"><input type="checkbox" id="c-ifvg"> IFVG Identified</label>
+          <label class="check-item"><input type="checkbox" id="c-valid"> Valid Entry</label>
+          <label class="check-item"><input type="checkbox" id="c-target"> Clear DOL</label>
+          <label class="check-item"><input type="checkbox" id="c-pd"> Correct P/D</label>
+          <label class="check-item"><input type="checkbox" id="c-momentum"> No Chop</label>
+        </div>
+      </div>
     </div>
-    <button class="detail-close" onclick="closeDetailPanel()">✕</button>
+
+    <button onclick="addTrade()" style="width:100%;margin-top:12px;">Add Trade</button>
   </div>
-  <div class="detail-body" id="detail-body"></div>
-</div>
 
-<!-- Lightbox -->
-<div id="lightbox">
-  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
-  <img id="lightbox-img" src="" alt="chart">
-</div>
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('All')">All</button>
+    <button class="tab win-tab" onclick="setTab('Win')">Wins</button>
+    <button class="tab loss-tab" onclick="setTab('Loss')">Losses</button>
+    <button class="tab be-tab" onclick="setTab('BE')">BE</button>
+  </div>
+  <div id="trades"></div>
 
-<script>
-const trades = JSON.parse(localStorage.getItem("trades")) || [];
-const content = document.getElementById("content");
+  <!-- Note overlay -->
+  <div id="note-overlay" onclick="closeNotePanel()"></div>
 
-document.getElementById("lightbox").addEventListener("click", function(e) {
-  if (e.target === this) closeLightbox();
-});
+  <!-- Note panel -->
+  <div id="note-panel">
+    <div class="note-panel-header">
+      <span class="note-panel-title">Trade Note</span>
+      <button class="note-panel-done" onclick="closeNotePanel()">Done</button>
+    </div>
+    <div class="note-doc">
 
-function closeLightbox() {
-  document.getElementById("lightbox").classList.remove("open");
-}
+      <div class="note-q">
+        <span class="note-q-label">Why did you enter this trade?</span>
+        <textarea id="nq-reason" rows="3" oninput="autoResize(this)"></textarea>
+      </div>
 
-function openLightbox(src) {
-  document.getElementById("lightbox-img").src = src;
-  document.getElementById("lightbox").classList.add("open");
-}
+      <div class="note-q">
+        <span class="note-q-label">Was the trade aligned with your analysis?</span>
+        <textarea id="nq-analysis" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
 
-if (trades.length === 0) {
-  content.innerHTML = `<p class="empty">No trades logged yet. Add some in the Journal first.</p>`;
-} else {
-try {
-  const wins   = trades.filter(t => t.result === "Win");
-  const losses = trades.filter(t => t.result === "Loss");
-  const bes    = trades.filter(t => t.result === "BE");
-  const total  = trades.length;
-  const winRate = ((wins.length / total) * 100).toFixed(0);
+      <div class="note-q">
+        <span class="note-q-label">Were your rules followed?</span>
+        <textarea id="nq-rules" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
 
-  // ── RR parsing ──
-  function parseRR(rr) {
-    if (!rr) return null;
-    const c = rr.match(/(\d+\.?\d*)\s*:\s*(\d+\.?\d*)/);
-    if (c) return parseFloat(c[2]) / parseFloat(c[1]);
-    const n = parseFloat(rr);
-    return isNaN(n) ? null : n;
-  }
-  function avgRR(set) {
-    const v = set.map(t => parseRR(t.rr)).filter(x => x !== null);
-    return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(2) : null;
-  }
+      <div class="note-q">
+        <span class="note-q-label">Was your mindset in the right place?</span>
+        <textarea id="nq-mindset" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
 
-  // ── Per-pair stats ──
-  const pairs = [...new Set(trades.map(t => t.pair))];
-  const pairStats = pairs.map(p => {
-    const pt = trades.filter(t => t.pair === p);
-    return {
-      pair: p, total: pt.length,
-      wins:   pt.filter(t => t.result === "Win").length,
-      losses: pt.filter(t => t.result === "Loss").length,
-      bes:    pt.filter(t => t.result === "BE").length
-    };
-  }).sort((a,b) => b.total - a.total);
+      <div class="note-q">
+        <span class="note-q-label">How did you feel coming into this trade?</span>
+        <textarea id="nq-feeling" rows="2" oninput="autoResize(this)"></textarea>
+      </div>
 
-  // ── STRUCTURED PATTERN ENGINE ──
-  // Detects win/loss-rate patterns from combinations of structured trade fields.
-  // No word frequency — all signal comes from pair, tradeType, checklist, and confidence.
+      <div class="note-q">
+        <span class="note-q-label">Would you take it again if it presented itself?</span>
+        <div class="yn-row">
+          <button type="button" class="yn-btn yn-yes" id="yn-yes" onclick="setYN('yes')">Yes</button>
+          <button type="button" class="yn-btn yn-no"  id="yn-no"  onclick="setYN('no')">No</button>
+        </div>
+      </div>
 
-  const patternEngine = (() => {
-    const MIN = 3; // minimum trades required to surface a pattern
-    const CLL = {
-      sweep: "BSL/SSL Swept", ifvg: "IFVG Identified", valid: "Valid Entry",
-      target: "Clear DOL", pd: "Correct P/D", momentum: "No Chop"
-    };
+      <div class="note-q" style="margin-top:24px;">
+        <span class="note-q-label">How confident were you? &nbsp;<span id="conf-value-label" style="color:#8b3a44;font-size:13px;font-weight:bold;">—</span></span>
+        <div class="conf-row">
+          <input type="range" id="nq-confidence" min="1" max="10" value="5" oninput="updateConfLabel()">
+          <span class="conf-value" id="conf-value-display">—</span>
+        </div>
+        <div class="conf-labels"><span>1 – No conviction</span><span>10 – Full confidence</span></div>
+      </div>
 
-    function wr(set)  { return Math.round(set.filter(t => t.result === "Win").length  / set.length * 100); }
-    function lr(set)  { return Math.round(set.filter(t => t.result === "Loss").length / set.length * 100); }
+    </div>
+  </div>
 
-    // Build a pattern record. Returns null if set is below MIN trades.
-    function detect(label, set, vsSet) {
-      if (set.length < MIN) return null;
-      const wins     = set.filter(t => t.result === "Win").length;
-      const losses   = set.filter(t => t.result === "Loss").length;
-      const winRate  = wr(set);
-      const lossRate = lr(set);
-      const vsWR = (vsSet && vsSet.length >= 2)
-        ? Math.round(vsSet.filter(t => t.result === "Win").length / vsSet.length * 100)
-        : null;
-      const type = winRate >= 65 ? "good" : lossRate >= 60 ? "warning" : "info";
-      return { label, count: set.length, wins, losses, wr: winRate, lr: lossRate, vsWR, type };
-    }
+  <!-- Trade detail overlay + panel -->
+  <div id="detail-overlay" onclick="closeDetailPanel()"></div>
+  <div id="detail-panel">
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <div class="detail-title" id="detail-title">—</div>
+        <div class="detail-subtitle" id="detail-subtitle">—</div>
+      </div>
+      <button class="detail-close" onclick="closeDetailPanel()">✕</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
 
-    const found = [];
-    const push  = p => { if (p) found.push(p); };
+  <!-- Lightbox -->
+  <div id="lightbox">
+    <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightbox-img" src="" alt="chart">
+  </div>
 
-    const allPairs = [...new Set(trades.map(t => t.pair))];
-    const withCL   = trades.filter(t => t.checklist);
-    const withConf = trades.filter(t => t.confidence);
+  <script>
+  let trades = JSON.parse(localStorage.getItem("trades")) || [];
+  let pendingImage      = null;
+  let pendingNote       = "";
+  let pendingConfidence = null;
+  let pendingYN         = null;  // "yes" | "no" | null
+  let activeTab = "All";
 
-    // 1. By trade type
-    ["Reversal", "Continuation"].forEach(type => {
-      const sub   = trades.filter(t => t.tradeType === type);
-      const other = trades.filter(t => t.tradeType && t.tradeType !== type);
-      push(detect(`${type} trades`, sub, other));
-    });
-
-    // 2. By pair × type combo
-    allPairs.forEach(pair => {
-      ["Reversal", "Continuation"].forEach(type => {
-        const sub = trades.filter(t => t.pair === pair && t.tradeType === type);
-        push(detect(`${pair} ${type}`, sub));
-      });
-    });
-
-    // 3. By confidence band
-    [
-      { label: "High confidence (≥8/10)", filter: t => t.confidence >= 8, vs: t => t.confidence < 8 },
-      { label: "Low confidence (≤5/10)",  filter: t => t.confidence <= 5, vs: t => t.confidence > 5 },
-    ].forEach(({ label, filter, vs }) => {
-      push(detect(label, withConf.filter(filter), withConf.filter(vs)));
-    });
-
-    // 4. By type + confidence band
-    ["Reversal", "Continuation"].forEach(type => {
-      const typed = trades.filter(t => t.tradeType === type && t.confidence);
-      [
-        { label: `${type} + confidence ≥7`, filter: t => t.confidence >= 7 },
-        { label: `${type} + confidence ≤5`, filter: t => t.confidence <= 5 },
-      ].forEach(({ label, filter }) => {
-        push(detect(label, typed.filter(filter), typed.filter(t => !filter(t))));
-      });
-    });
-
-    // 5. Per checklist condition — only surface if WR gap vs absent is ≥20pp
-    ["sweep", "ifvg", "valid", "target", "pd", "momentum"].forEach(k => {
-      const present = withCL.filter(t =>  t.checklist[k]);
-      const absent  = withCL.filter(t => !t.checklist[k]);
-      const p = detect(`With "${CLL[k]}"`, present, absent);
-      if (!p) return;
-      const absentWR = absent.length >= 2
-        ? Math.round(absent.filter(t => t.result === "Win").length / absent.length * 100)
-        : null;
-      if (absentWR !== null && Math.abs(p.wr - absentWR) >= 20) push(p);
-    });
-
-    // 6. Trades without sweep specifically
-    push(detect("Without sweep", withCL.filter(t => !t.checklist.sweep)));
-
-    // 7. Grade tiers
-    const aPlus   = trades.filter(t => t.grade && (t.grade === "A+" || t.grade === "A"));
-    const bcGrade = trades.filter(t => t.grade && ["B", "B-", "C"].includes(t.grade));
-    push(detect("A/A+ grade setups", aPlus, bcGrade));
-    push(detect("B/C grade setups",  bcGrade, aPlus));
-
-    // De-duplicate, then rank by extremity from 50% WR, then sample size
-    const seen = new Set();
-    return found
-      .filter(p => { if (seen.has(p.label)) return false; seen.add(p.label); return true; })
-      .sort((a, b) => Math.abs(b.wr - 50) - Math.abs(a.wr - 50) || b.count - a.count);
-  })();
-
-  // ── WORD FREQUENCY UTILITIES ──
-  // wordPresence and biasedWords are available as utilities.
-  // Main output uses category-based pattern detection below.
-  const STOP = new Set([
-    // Common English stop words
-    "the","a","an","and","or","but","in","on","at","to","for","of","with","it","is","was",
-    "were","be","been","being","have","has","had","do","does","did","will","would","could",
-    "should","may","might","shall","can","this","that","these","those","i","my","me","we",
-    "our","you","your","he","his","she","her","they","their","them","its","what","which",
-    "who","there","here","when","where","why","how","all","each","every","no","not","so",
-    "than","very","just","also","about","up","out","as","if","then","into","from","after",
-    "before","while","though","because","since","still","even","such","off","over","only",
-    "both","through","without","back","right","more","most","other","now","too","already",
-    "get","got","went","came","made","said","want","like","know","see","think","take","put",
-    "set","go","try","let","use","find","feel","keep","show","stop","give","look","turn",
-    "start","hear","run","work","call","seem","happen","come","become","really","one","two",
-    "three","day","time","way","lot","bit","well","around","pretty","quite","actually",
-    "basically","overall","generally","honestly","literally","definitely","probably","maybe",
-    // Trading filler — too generic to signal anything
-    "trade","trades","traded","trading","setup","setups","market","price","level","levels",
-    "rules","rule","plan","played","play","entry","exit","took","taken","position","again",
-    "great","nice","fine","okay","yes","yep","nope","yeah","sure","felt","looked","thought",
-    "seemed","done","went","had","got","been","things","something","anything","nothing"
-  ]);
-
-  function wordPresence(tradeSet) {
-    const freq = {};
-    tradeSet.forEach(t => {
-      const text = (t.notes || "").toLowerCase();
-      const words = text.match(/\b[a-z']{3,}\b/g) || [];
-      words.forEach(w => {
-        if (!STOP.has(w)) freq[w] = (freq[w] || 0) + 1;
-      });
-    });
-    return freq;
+  // ── Note panel helpers ──
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
   }
 
-  function biasedWords(main, other, mainTotal, otherTotal, minBias) {
-    if (minBias === undefined) minBias = 30;
-    if (!mainTotal) return [];
-    const results = [];
-    Object.keys(main).forEach(function(word) {
-      const mainRate  = (main[word]  / mainTotal)  * 100;
-      const otherRate = (other[word] && otherTotal) ? (other[word] / otherTotal) * 100 : 0;
-      const bias = mainRate - otherRate;
-      if (bias >= minBias && main[word] >= 3) {
-        results.push({ word: word, count: main[word], bias: Math.round(bias) });
-      }
-    });
-    return results.sort(function(a, b) { return b.bias - a.bias; });
+  function setYN(val) {
+    pendingYN = val;
+    document.getElementById("yn-yes").classList.toggle("active", val === "yes");
+    document.getElementById("yn-no").classList.toggle("active", val  === "no");
   }
 
-  // ── NOTE PATTERN CATEGORIES ──
-  // Category-based detection: each category matches a family of journal keywords.
-  // Only surfaces patterns that appear in ≥30% of losses with ≥2 trades.
-  const NOTE_CATEGORIES = [
-    { name:"FOMO / Chasing",       color:"#ff7043", regex:/chasing|chased|fomo|fear.*miss|miss.*move|late entry|jumped in|didn'?t wait|should.*waited|impatient|rushed|hurr/i },
-    { name:"Emotional Trading",    color:"#e53935", regex:/angry|frustrated|revenge|emotional|emotion|upset|anxious|stressed?|tilt|tilted|nervous|panic|panick|scared/i },
-    { name:"Discipline Break",     color:"#e53935", regex:/forced|shouldn'?t|no trade day|against.*rules?|broke.*rules?|didn'?t want|not my setup|violated|shouldn'?t have|shouldn'?t of/i },
-    { name:"Low Conviction",       color:"#ffa726", regex:/wasn'?t confident|not confident|low confidence|felt off|didn'?t feel right|unsure|uncertain|second.?guess|size.*down|sized.*down/i },
-    { name:"Poor Entry Timing",    color:"#ffa726", regex:/too early|early entry|wrong timing|bad timing|mistimed|jumped.*gun|anticipated|pre.?empted|rushed.*entry/i },
-    { name:"Wrong Market Read",    color:"#8bc34a", regex:/wrong.*draw|wrong.*target|wrong.*direction|misread|fighting.*trend|counter.?trend|wrong.*bias|wrong.*side/i },
-    { name:"News / Event Day",     color:"#ab47bc", regex:/fomc|news day|high.?impact|trump|fed chair|cpi\b|nfp\b|macro event|big news/i }
-  ];
-
-  const lossNoteCategories = losses.length >= 3
-    ? NOTE_CATEGORIES.map(cat => {
-        const matched = losses.filter(t => cat.regex.test(t.notes || ""));
-        const pct = Math.round(matched.length / losses.length * 100);
-        return { name: cat.name, color: cat.color, count: matched.length, pct: pct };
-      }).filter(p => p.count >= 2 && p.pct >= 30)
-    : [];
-
-  const insights = [];
-
-  // 1. Pair loss rate
-  const worstPair = [...pairStats].sort((a,b) => b.losses - a.losses)[0];
-  if (worstPair?.losses > 0) {
-    const r = ((worstPair.losses / worstPair.total)*100).toFixed(0);
-    if (r >= 50) insights.push({ level:"warning", text: `You lose <strong>${r}%</strong> of your <strong>${worstPair.pair}</strong> trades (${worstPair.losses}/${worstPair.total}). Consider cutting your size or skipping this instrument until you identify what's going wrong.` });
-    else insights.push({ level:"info", text: `<strong>${worstPair.pair}</strong> has your most losses at <strong>${r}%</strong> loss rate (${worstPair.losses}/${worstPair.total}).` });
+  // Slider starts unset — only "activate" once user moves it
+  let confTouched = false;
+  function updateConfLabel() {
+    confTouched = true;
+    const v = document.getElementById("nq-confidence").value;
+    const col = v >= 8 ? "#4caf50" : v >= 5 ? "#ffa726" : "#e53935";
+    document.getElementById("conf-value-display").textContent = v + "/10";
+    document.getElementById("conf-value-display").style.color = col;
+    document.getElementById("conf-value-label").textContent = v + "/10";
+    document.getElementById("conf-value-label").style.color = col;
   }
 
-  // 2. Best pair
-  const bestPair = [...pairStats].sort((a,b) => (b.wins/b.total)-(a.wins/a.total))[0];
-  if (bestPair?.wins > 0) {
-    const r = ((bestPair.wins / bestPair.total)*100).toFixed(0);
-    insights.push({ level:"good", text: `<strong>${bestPair.pair}</strong> is your best pair — <strong>${r}%</strong> win rate. Stick to setups that have worked here.` });
-  }
-
-  // 3. RR analysis
-  const avgW = avgRR(wins), avgL = avgRR(losses);
-  if (avgW && avgL) {
-    const ratio = (parseFloat(avgW) / parseFloat(avgL)).toFixed(2);
-    const msg = `Average RR on wins: <strong>${avgW}R</strong> &nbsp;|&nbsp; on losses: <strong>${avgL}R</strong>.`;
-    if (parseFloat(avgL) > parseFloat(avgW)) insights.push({ level:"warning", text: msg + ` You're letting losers run bigger than your winners — this kills your account even with a decent win rate.` });
-    else insights.push({ level:"info", text: msg + ` Your winners are bigger than your losers — good.` });
-  }
-
-  // 4. Losing streak
-  let maxStreak = 0, curStreak = 0, currentStreak = 0;
-  trades.forEach(t => {
-    if (t.result === "Loss") { curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
-    else curStreak = 0;
-  });
-  // current streak at end
-  for (let i = trades.length-1; i >= 0; i--) {
-    if (trades[i].result === "Loss") currentStreak++;
-    else break;
-  }
-  if (currentStreak >= 2) insights.push({ level:"warning", text: `You're currently on a <strong>${currentStreak}-loss streak</strong>. Step back and review before your next trade.` });
-  else if (maxStreak >= 3) insights.push({ level:"info", text: `Your longest losing streak was <strong>${maxStreak} in a row</strong>. Make sure you have a rule for when to stop trading for the day.` });
-
-  // 5. Revenge trading — loss immediately followed by another loss on same pair
-  let revengeCnt = 0;
-  for (let i = 1; i < trades.length; i++) {
-    if (trades[i-1].result === "Loss" && trades[i].result === "Loss" && trades[i-1].pair === trades[i].pair) revengeCnt++;
-  }
-  if (revengeCnt >= 2) insights.push({ level:"warning", text: `Possible <strong>revenge trading</strong> detected — you've taken back-to-back losses on the same pair <strong>${revengeCnt} times</strong>. After a loss, pause before re-entering.` });
-
-  // 6. Structured pattern insights — surface best and worst setup combinations
-  patternEngine
-    .filter(p => p.type === "good" && p.wr >= 65)
-    .slice(0, 3)
-    .forEach(p => {
-      const vs = p.vsWR !== null ? ` vs ${p.vsWR}% for other setups.` : ".";
-      insights.push({ level: "good", text: `<strong>${p.label}</strong>: <strong>${p.wr}%</strong> win rate (${p.wins}W / ${p.losses}L over ${p.count} trades)${vs}` });
-    });
-  patternEngine
-    .filter(p => p.type === "warning" && p.lr >= 60)
-    .slice(0, 3)
-    .forEach(p => {
-      const vs = p.vsWR !== null ? ` Other setups win ${p.vsWR}% of the time.` : "";
-      insights.push({ level: "warning", text: `<strong>${p.label}</strong>: <strong>${p.lr}%</strong> loss rate across ${p.count} trades.${vs}` });
-    });
-
-  // 8. Win rate trend (first half vs second half)
-  if (total >= 6) {
-    const half = Math.floor(total/2);
-    const early = trades.slice(0, half);
-    const recent = trades.slice(half);
-    const earlyWR = (early.filter(t=>t.result==="Win").length / half * 100).toFixed(0);
-    const recentWR = (recent.filter(t=>t.result==="Win").length / recent.length * 100).toFixed(0);
-    const diff = parseInt(recentWR) - parseInt(earlyWR);
-    if (diff <= -20) insights.push({ level:"warning", text: `Your win rate has <strong>dropped ${Math.abs(diff)}%</strong> recently (${earlyWR}% early → ${recentWR}% recent). Something has changed in your execution or market conditions.` });
-    else if (diff >= 20) insights.push({ level:"good", text: `Your win rate has <strong>improved ${diff}%</strong> recently (${earlyWR}% early → ${recentWR}% recent). You're getting better — keep going.` });
-  }
-
-  // 9. Overtrading check
-  if (total >= 10 && (losses.length / total) > 0.6) {
-    insights.push({ level:"warning", text: `With a <strong>${winRate}% win rate</strong> across ${total} trades, you may be overtrading or entering low-quality setups. Quality over quantity.` });
-  }
-
-  // 10. Confidence analysis
-  const confTrades = trades.filter(t => t.confidence);
-  if (confTrades.length >= 3) {
-    const confWins   = wins.filter(t => t.confidence);
-    const confLosses = losses.filter(t => t.confidence);
-    const avgConfWin  = confWins.length   ? (confWins.reduce((a,t)=>a+t.confidence,0)/confWins.length).toFixed(1)   : null;
-    const avgConfLoss = confLosses.length ? (confLosses.reduce((a,t)=>a+t.confidence,0)/confLosses.length).toFixed(1) : null;
-    if (avgConfWin && avgConfLoss) {
-      if (parseFloat(avgConfLoss) <= 5 && parseFloat(avgConfWin) > parseFloat(avgConfLoss)) {
-        insights.push({ level:"warning", text: `Avg confidence on <strong>losses: ${avgConfLoss}/10</strong> vs <strong>wins: ${avgConfWin}/10</strong>. You're entering your worst trades with low conviction — if confidence isn't there, skip it.` });
-      } else {
-        insights.push({ level:"info", text: `Avg confidence — wins: <strong>${avgConfWin}/10</strong> | losses: <strong>${avgConfLoss}/10</strong>.` });
-      }
-    }
-    const lowConfLosses = losses.filter(t => t.confidence && t.confidence <= 4).length;
-    if (lowConfLosses >= 2) {
-      insights.push({ level:"warning", text: `<strong>${lowConfLosses} losses</strong> were entered with confidence ≤ 4/10. Low conviction is costing you — use confidence as a hard filter.` });
-    }
-    const highConfWinCount = wins.filter(t => t.confidence && t.confidence >= 8).length;
-    if (highConfWinCount >= 2) {
-      insights.push({ level:"good", text: `<strong>${highConfWinCount} wins</strong> were taken at confidence 8+/10. Your highest conviction trades perform best — lean into them.` });
-    }
-  }
-
-  // 11. Setup grade analysis
-  const gradedTrades = trades.filter(t => t.grade);
-  if (gradedTrades.length >= 3) {
-    // Win rate per grade tier
-    const aPlusTrades = gradedTrades.filter(t => t.grade === "A+" || t.grade === "A");
-    const aMinus      = gradedTrades.filter(t => t.grade === "A-" || t.grade === "B+");
-    const bOrLower    = gradedTrades.filter(t => ["B","B-","C"].includes(t.grade));
-
-    if (aPlusTrades.length >= 2) {
-      const wr = ((aPlusTrades.filter(t=>t.result==="Win").length / aPlusTrades.length)*100).toFixed(0);
-      insights.push({ level:"good", text: `Your <strong>A/A+ setups</strong> win <strong>${wr}%</strong> of the time (${aPlusTrades.length} trades). These are your bread-and-butter — only trade these when you can.` });
-    }
-    if (bOrLower.length >= 2) {
-      const wr = ((bOrLower.filter(t=>t.result==="Win").length / bOrLower.length)*100).toFixed(0);
-      const losses = bOrLower.filter(t=>t.result==="Loss").length;
-      if (losses >= 1) insights.push({ level:"warning", text: `You've taken <strong>${bOrLower.length} B/C grade setups</strong> and only won <strong>${wr}%</strong>. These are low-quality entries — cut them entirely or size way down.` });
-    }
-
-    // Most common losing grade
-    const gradeLosses = {};
-    losses.filter(t=>t.grade).forEach(t => { gradeLosses[t.grade] = (gradeLosses[t.grade]||0)+1; });
-    const worstGrade = Object.entries(gradeLosses).sort((a,b)=>b[1]-a[1])[0];
-    if (worstGrade && worstGrade[1] >= 2) {
-      insights.push({ level:"warning", text: `Your most common losing setup grade is <strong>${worstGrade[0]}</strong> (${worstGrade[1]} losses). You keep entering at this quality level and losing — raise your minimum.` });
-    }
-  }
-
-  // 12. Reversal vs Continuation model win rate
-  const reversals     = trades.filter(t => t.tradeType === "Reversal");
-  const continuations = trades.filter(t => t.tradeType === "Continuation");
-  if (reversals.length >= 3 && continuations.length >= 3) {
-    const revWR  = ((reversals.filter(t=>t.result==="Win").length/reversals.length)*100).toFixed(0);
-    const contWR = ((continuations.filter(t=>t.result==="Win").length/continuations.length)*100).toFixed(0);
-    const diff   = Math.abs(parseInt(revWR) - parseInt(contWR));
-    if (diff >= 15) {
-      const better   = parseInt(revWR) > parseInt(contWR) ? "Reversal" : "Continuation";
-      const betterWR = Math.max(parseInt(revWR), parseInt(contWR));
-      const worse    = better === "Reversal" ? "Continuation" : "Reversal";
-      const worseWR  = Math.min(parseInt(revWR), parseInt(contWR));
-      insights.push({ level:"info", text: `<strong>${better} model</strong> wins <strong>${betterWR}%</strong> vs ${worse} at <strong>${worseWR}%</strong>. You execute better in one model — figure out why and lean into it.` });
+  function openNotePanel() {
+    // Restore answers
+    document.getElementById("nq-reason").value    = pendingNoteData.reason;
+    document.getElementById("nq-analysis").value  = pendingNoteData.analysis;
+    document.getElementById("nq-rules").value      = pendingNoteData.rules;
+    document.getElementById("nq-mindset").value    = pendingNoteData.mindset;
+    document.getElementById("nq-feeling").value    = pendingNoteData.feeling;
+    // Restore YN
+    if (pendingYN) setYN(pendingYN);
+    // Restore confidence
+    if (pendingConfidence !== null) {
+      confTouched = true;
+      document.getElementById("nq-confidence").value = pendingConfidence;
+      updateConfLabel();
     } else {
-      insights.push({ level:"info", text: `Reversal: <strong>${revWR}%</strong> win rate (${reversals.length} trades) | Continuation: <strong>${contWR}%</strong> (${continuations.length} trades).` });
+      document.getElementById("conf-value-display").textContent = "—";
+      document.getElementById("conf-value-label").textContent  = "—";
+      confTouched = false;
     }
-  } else if (reversals.length + continuations.length >= 2) {
-    insights.push({ level:"info", text: `Tag all trades as Reversal or Continuation — once you have enough, patterns between models will surface here.` });
+    // Auto-resize textareas
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => autoResize(document.getElementById(id)));
+
+    document.getElementById("note-panel").classList.add("open");
+    document.getElementById("note-overlay").classList.add("open");
+    setTimeout(() => document.getElementById("nq-reason").focus(), 280);
   }
 
-  // 13. No-sweep losses (rule #1 violation)
-  const noSweepLosses = losses.filter(t => t.checklist && !t.checklist.sweep);
-  if (noSweepLosses.length >= 2) {
-    insights.push({ level:"warning", text: `<strong>${noSweepLosses.length} losses</strong> were taken <strong>without a BSL/SSL sweep</strong>. Rule #1 is non-negotiable — no sweep, no trade. These are your most avoidable losses.` });
+  function closeNotePanel() {
+    pendingNoteData.reason   = document.getElementById("nq-reason").value.trim();
+    pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
+    pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
+    pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
+    pendingNoteData.feeling  = document.getElementById("nq-feeling").value.trim();
+
+    // Build combined note string
+    const parts = [];
+    if (pendingNoteData.reason)   parts.push("Why I entered: "         + pendingNoteData.reason);
+    if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
+    if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
+    if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
+    if (pendingNoteData.feeling)  parts.push("Feeling: "               + pendingNoteData.feeling);
+    if (pendingYN)                parts.push("Would take again: "      + (pendingYN === "yes" ? "Yes" : "No"));
+    pendingNote = parts.join("\n");
+
+    // Save confidence
+    if (confTouched) pendingConfidence = parseInt(document.getElementById("nq-confidence").value);
+
+    document.getElementById("note-panel").classList.remove("open");
+    document.getElementById("note-overlay").classList.remove("open");
+    updateNoteTrigger();
   }
 
-  // 14. Invalid entry losses (sweep present but valid entry not checked)
-  const invalidEntryLosses = losses.filter(t => t.checklist && t.checklist.sweep && t.checklist.ifvg && !t.checklist.valid);
-  if (invalidEntryLosses.length >= 2) {
-    insights.push({ level:"warning", text: `<strong>${invalidEntryLosses.length} losses</strong> where you had the sweep and IFVG but <strong>entry was invalid</strong> (internal high/low already taken). Wait for inversion before the next internal level.` });
+  const pendingNoteData = { reason: "", analysis: "", rules: "", mindset: "", feeling: "" };
+
+  function updateNoteTrigger() {
+    const trigger  = document.getElementById("note-trigger");
+    const label    = document.getElementById("note-trigger-label");
+    const preview  = document.getElementById("note-trigger-preview");
+    const icon     = trigger.querySelector(".note-trigger-icon");
+    const clearBtn = document.getElementById("note-clear-btn");
+    const hasContent = pendingNote.trim() || pendingConfidence !== null;
+    if (hasContent) {
+      trigger.classList.add("has-note");
+      label.textContent = "Edit Note";
+      icon.textContent = "✎";
+      const lines = [];
+      if (pendingNote.trim()) lines.push(pendingNote.trim().split("\n")[0]);
+      if (pendingConfidence !== null) lines.push("Confidence: " + pendingConfidence + "/10");
+      preview.textContent = lines.slice(0, 2).join(" · ");
+      clearBtn.style.display = "inline";
+    } else {
+      trigger.classList.remove("has-note");
+      label.textContent = "Add Note";
+      icon.textContent = "+";
+      preview.textContent = "";
+      clearBtn.style.display = "none";
+    }
   }
 
-  // ── HTML ──
-  function pct(n) { return total > 0 ? Math.round((n/total)*100) : 0; }
-
-  function barRow(label, count, cls) {
-    const w = pct(count);
-    return `<div class="bar-group">
-      <div class="bar-label"><span>${label}</span><span>${count} (${w}%)</span></div>
-      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${w}%"></div></div>
-    </div>`;
+  function clearNote() {
+    pendingNote = "";
+    pendingConfidence = null;
+    pendingYN = null;
+    confTouched = false;
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    updateNoteTrigger();
   }
 
-  const pairBars = pairStats.map(p => `
-    <div class="bar-group">
-      <div class="bar-label"><span>${p.pair}</span><span>${p.total} trades — W:${p.wins} L:${p.losses} BE:${p.bes}</span></div>
-      <div style="display:flex;gap:3px;height:16px;">
-        <div class="bar-track" style="flex:${p.wins||0.01}"><div class="bar-fill win" style="width:100%"></div></div>
-        <div class="bar-track" style="flex:${p.losses||0.01}"><div class="bar-fill loss" style="width:100%"></div></div>
-        <div class="bar-track" style="flex:${p.bes||0.01}"><div class="bar-fill be" style="width:100%"></div></div>
-      </div>
-    </div>`).join("");
-
-  // ── Pre-compute grade & model bars ──
-  const GRADE_COLORS = { "A+":"#4caf50","A":"#66bb6a","A-":"#8bc34a","B+":"#ffa726","B":"#ff7043","B-":"#e53935","C":"#b71c1c" };
-  const gradeOrder = ["A+","A","A-","B+","B","B-","C"];
-
-  // gradedTrades already declared above (insight #11)
-  const gradeBars = gradedTrades.length >= 2 ? gradeOrder.map(g => {
-    const gt = gradedTrades.filter(t => t.grade === g);
-    if (gt.length === 0) return "";
-    const gWins = gt.filter(t => t.result === "Win").length;
-    const gLoss = gt.filter(t => t.result === "Loss").length;
-    const gWR   = ((gWins / gt.length) * 100).toFixed(0);
-    const col   = GRADE_COLORS[g] || "#888";
-    return `<div class="bar-group">
-      <div class="bar-label"><span style="color:${col};font-weight:bold;">${g}</span><span>${gt.length} trade${gt.length>1?"s":""} &nbsp;·&nbsp; W:${gWins} L:${gLoss} &nbsp;·&nbsp; <strong>${gWR}% WR</strong></span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${gWR}%;background:${col};"></div></div>
-    </div>`;
-  }).join("") : "";
-
-  const modelBars = (reversals.length + continuations.length >= 2) ? [
-    { label:"Reversal",     set: reversals,     color:"#42a5f5" },
-    { label:"Continuation", set: continuations, color:"#ab47bc" }
-  ].filter(x => x.set.length > 0).map(({ label, set, color }) => {
-    const w  = set.filter(t => t.result === "Win").length;
-    const wr = ((w / set.length) * 100).toFixed(0);
-    return `<div class="bar-group">
-      <div class="bar-label"><span style="font-weight:bold;">${label}</span><span>${set.length} trades &nbsp;·&nbsp; ${w} wins &nbsp;·&nbsp; <strong>${wr}% WR</strong></span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${wr}%;background:${color};"></div></div>
-    </div>`;
-  }).join("") : "";
-
-  // A/A+ rate stat
-  const aPlusCount  = gradedTrades.filter(t => t.grade === "A+" || t.grade === "A").length;
-  const aPlusRate   = gradedTrades.length ? Math.round((aPlusCount / gradedTrades.length) * 100) : null;
-
-  // Quality Score: checklist (0-6 pts) + confidence (0-4 pts) = 0-10
-  function qualityScore(t) {
-    let score = 0, hasSomething = false;
-    if (t.checklist) {
-      const keys = ["sweep","ifvg","valid","target","pd","momentum"];
-      score += (keys.filter(k => t.checklist[k]).length / 6) * 6;
-      hasSomething = true;
-    }
-    if (t.confidence) { score += (t.confidence / 10) * 4; hasSomething = true; }
-    return hasSomething ? Math.round(score) : null;
-  }
-  function qsColor(qs) { return qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935"; }
-
-  const scoredTrades = trades.map(t => ({ ...t, qs: qualityScore(t) })).filter(t => t.qs !== null);
-  const avgQS = scoredTrades.length
-    ? (scoredTrades.reduce((a, t) => a + t.qs, 0) / scoredTrades.length).toFixed(1)
-    : null;
-  const avgQSWin  = scoredTrades.filter(t => t.result === "Win").length
-    ? (scoredTrades.filter(t => t.result === "Win").reduce((a,t)=>a+t.qs,0) / scoredTrades.filter(t=>t.result==="Win").length).toFixed(1)
-    : null;
-  const avgQSLoss = scoredTrades.filter(t => t.result === "Loss").length
-    ? (scoredTrades.filter(t => t.result === "Loss").reduce((a,t)=>a+t.qs,0) / scoredTrades.filter(t=>t.result==="Loss").length).toFixed(1)
-    : null;
-
-  // ── Rule Correlation + Loss DNA ──
-  const dnaKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
-  const dnaLabels = ["BSL/SSL Swept","IFVG Identified","Valid Entry","Clear DOL","Correct P/D","No Chop"];
-  const tradesWithCL = trades.filter(t => t.checklist);
-  const lossesWithCL = losses.filter(t => t.checklist);
-
-  // Per-rule: how often broken, WR with vs without
-  const ruleStats = dnaKeys.map((k, i) => {
-    const present = tradesWithCL.filter(t =>  t.checklist[k]);
-    const absent  = tradesWithCL.filter(t => !t.checklist[k]);
-    const pWR = present.length ? Math.round(present.filter(t=>t.result==="Win").length/present.length*100) : null;
-    const aWR = absent.length  ? Math.round(absent.filter(t=>t.result==="Win").length/absent.length*100)   : null;
-    return { label: dnaLabels[i], key: k, broken: absent.length,
-      brokenPct: tradesWithCL.length ? Math.round(absent.length/tradesWithCL.length*100) : 0,
-      presentWR: pWR, absentWR: aWR, impact: (pWR !== null && aWR !== null) ? pWR - aWR : null };
-  });
-
-  // Loss fingerprints: grade + conf band + missing checklist items
-  const fpMap = {};
-  losses.forEach(t => {
-    const g  = t.grade || "–";
-    const cb = !t.confidence ? "no conf" : t.confidence<=4 ? "≤4" : t.confidence<=6 ? "5-6" : "7+";
-    const ms = t.checklist ? dnaKeys.filter(k=>!t.checklist[k]).map((_,i)=>dnaLabels[dnaKeys.indexOf(dnaKeys[i])]) : [];
-    const fp = g+"|"+cb+"|"+ms.join(",");
-    if (!fpMap[fp]) fpMap[fp] = { grade:g, confBand:cb, missing:ms, count:0 };
-    fpMap[fp].count++;
-  });
-  const topLossProfiles = Object.values(fpMap).sort((a,b)=>b.count-a.count).slice(0,5);
-
-  // Highest probability setup: grade + model combo with best WR (min 2 trades)
-  const setupMap = {};
-  trades.forEach(t => {
-    if (!t.grade) return;
-    const key = t.grade + (t.model ? "|"+t.model : "");
-    if (!setupMap[key]) setupMap[key] = { grade: t.grade, model: t.model||"", wins:0, total:0 };
-    setupMap[key].total++;
-    if (t.result === "Win") setupMap[key].wins++;
-  });
-  const bestSetup = Object.values(setupMap)
-    .filter(s => s.total >= 2)
-    .map(s => ({ ...s, wr: Math.round(s.wins/s.total*100) }))
-    .sort((a,b) => b.wr - a.wr || b.total - a.total)[0] || null;
-
-  // Biggest mistake patterns (quantified)
-  const mistakePatterns = [];
-  if (losses.length > 0) {
-    const noSweepL    = losses.filter(t => t.checklist && !t.checklist.sweep);
-    const noIfvgL     = losses.filter(t => t.checklist && t.checklist.sweep && !t.checklist.ifvg);
-    const noValidL    = losses.filter(t => t.checklist && !t.checklist.valid);
-    const lowConfL    = losses.filter(t => t.confidence && t.confidence <= 4);
-    const lowGradeL   = losses.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
-    const forcedL     = losses.filter(t => /forced|shouldnt|shouldn't|didnt want|didn't want|shouldn't/i.test(t.notes||""));
-    const emotionalL  = losses.filter(t => /emotional|emotion|chasing|revenge|frustrated|angry|upset/i.test(t.notes||""));
-    const newsL       = losses.filter(t => /fomc|news|trump|fed|report/i.test(t.notes||""));
-    if (noSweepL.length)    mistakePatterns.push({ label:"Entering without BSL/SSL sweep", count: noSweepL.length, pct: Math.round(noSweepL.length/losses.length*100), color:"#e53935" });
-    if (noValidL.length)    mistakePatterns.push({ label:"Taking invalid entries (IFVG not inverted first)", count: noValidL.length, pct: Math.round(noValidL.length/losses.length*100), color:"#ff7043" });
-    if (noIfvgL.length)     mistakePatterns.push({ label:"No IFVG identified before entry", count: noIfvgL.length, pct: Math.round(noIfvgL.length/losses.length*100), color:"#ffa726" });
-    if (lowConfL.length)    mistakePatterns.push({ label:"Entering at low confidence (≤4/10)", count: lowConfL.length, pct: Math.round(lowConfL.length/losses.length*100), color:"#ffa726" });
-    if (lowGradeL.length)   mistakePatterns.push({ label:"Taking B/C grade setups (below standard)", count: lowGradeL.length, pct: Math.round(lowGradeL.length/losses.length*100), color:"#ff7043" });
-    if (forcedL.length)     mistakePatterns.push({ label:"Forcing trades (noted in journal)", count: forcedL.length, pct: Math.round(forcedL.length/losses.length*100), color:"#e53935" });
-    if (emotionalL.length)  mistakePatterns.push({ label:"Trading emotionally / revenge trading", count: emotionalL.length, pct: Math.round(emotionalL.length/losses.length*100), color:"#e53935" });
-    if (newsL.length)       mistakePatterns.push({ label:"Trading on high-impact news days", count: newsL.length, pct: Math.round(newsL.length/losses.length*100), color:"#ffa726" });
-    mistakePatterns.sort((a,b) => b.count - a.count);
-  }
-
-  const lossDNAHTML = (function() {
-    if (losses.length < 2 && tradesWithCL.length < 2) return "";
-    const sortedRules = [...ruleStats].sort((a,b)=>b.brokenPct-a.brokenPct);
-    const impactRules = [...ruleStats].filter(r=>r.impact!==null).sort((a,b)=>b.impact-a.impact);
-
-    const ruleBreakBars = sortedRules.filter(r=>r.broken>0).map(r => {
-      const impactSign = r.impact !== null ? (r.impact > 0 ? `<span style="color:#4caf50;font-size:11px;">+${r.impact}% WR when followed</span>` : `<span style="color:#888;font-size:11px;">${r.impact}% WR difference</span>`) : "";
-      return `<div class="bar-group">
-        <div class="bar-label">
-          <span>${r.label}</span>
-          <span>broken ${r.broken}x (${r.brokenPct}%) &nbsp;${impactSign}</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill loss" style="width:${r.brokenPct}%;"></div></div>
-      </div>`;
-    }).join("");
-
-    const wrCompareRows = impactRules.map(r => {
-      const pwCol = r.presentWR >= 60 ? "#4caf50" : r.presentWR >= 40 ? "#ffa726" : "#e53935";
-      const awCol = r.absentWR  >= 60 ? "#4caf50" : r.absentWR  >= 40 ? "#ffa726" : "#e53935";
-      return `<tr>
-        <td style="padding:5px 8px;color:#ccc;">${r.label}</td>
-        <td style="padding:5px 8px;text-align:center;color:${pwCol};font-weight:bold;">${r.presentWR !== null ? r.presentWR+"%" : "–"}</td>
-        <td style="padding:5px 8px;text-align:center;color:${awCol};">${r.absentWR  !== null ? r.absentWR+"%" : "–"}</td>
-        <td style="padding:5px 8px;text-align:center;color:${r.impact>0?"#4caf50":r.impact<0?"#e53935":"#888"};">${r.impact !== null ? (r.impact>0?"+":"")+r.impact+"%" : "–"}</td>
-      </tr>`;
-    }).join("");
-
-    const profileCards = topLossProfiles.map(p => {
-      const missingStr = p.missing.length ? p.missing.join(", ") : "All rules followed";
-      const col = p.missing.length === 0 ? "#ffa726" : "#e53935";
-      return `<div style="background:#1a1a1a;border:1px solid ${col};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-weight:bold;font-size:13px;">Grade ${p.grade} &nbsp;·&nbsp; Conf ${p.confBand}</span>
-          <span style="background:${col};color:#fff;border-radius:4px;padding:2px 8px;font-size:12px;">${p.count}x</span>
-        </div>
-        <div style="font-size:12px;color:#aaa;">Missing: <span style="color:${col};">${missingStr}</span></div>
-      </div>`;
-    }).join("");
-
-    const bestSetupHTML = bestSetup ? `
-      <div style="background:#0d2a1a;border:1px solid #4caf50;border-radius:8px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:13px;color:#888;margin-bottom:6px;">Your highest probability setup (min 2 trades):</div>
-        <div style="font-size:22px;font-weight:bold;color:#4caf50;">${bestSetup.grade}${bestSetup.model ? " · "+bestSetup.model : ""}</div>
-        <div style="font-size:13px;color:#ccc;margin-top:4px;">${bestSetup.wins}W / ${bestSetup.total-bestSetup.wins}L across ${bestSetup.total} trades &nbsp;·&nbsp; <strong style="color:#4caf50;">${bestSetup.wr}% win rate</strong></div>
-        <div style="font-size:12px;color:#888;margin-top:6px;">Stack the deck: only take trades that match this profile.</div>
-      </div>` : "";
-
-    const mistakeHTML = mistakePatterns.length ? mistakePatterns.map(m =>
-      `<div class="bar-group">
-        <div class="bar-label"><span style="color:${m.color};">${m.label}</span><span>${m.count} loss${m.count>1?"es":""} (${m.pct}% of all losses)</span></div>
-        <div class="bar-track"><div class="bar-fill loss" style="width:${m.pct}%;background:${m.color};"></div></div>
-      </div>`).join("") : `<div style="color:#888;font-size:13px;">Add more notes to your trades — mistake patterns will surface here.</div>`;
-
-    return `
-    <!-- Rule Analysis & Loss DNA -->
-    <hr class="divider">
-    <div class="section-title" style="margin-top:0;">Rule Analysis &amp; Loss DNA</div>
-
-    ${bestSetupHTML}
-
-    ${ruleBreakBars ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;font-size:13px;color:#e53935;">Rules Broken Most Often (in losses)</div>
-      ${ruleBreakBars}
-    </div>` : ""}
-
-    ${wrCompareRows ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;font-size:13px;">Win Rate: Rule Followed vs Broken</div>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="color:#888;border-bottom:1px solid #333;">
-            <th style="text-align:left;padding:5px 8px;">Rule</th>
-            <th style="padding:5px 8px;">WR (followed)</th>
-            <th style="padding:5px 8px;">WR (broken)</th>
-            <th style="padding:5px 8px;">Impact</th>
-          </tr></thead>
-          <tbody>${wrCompareRows}</tbody>
-        </table>
-      </div>
-    </div>` : ""}
-
-    ${mistakePatterns.length ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;font-size:13px;color:#ffa726;">Your Biggest Trading Mistakes</div>
-      ${mistakeHTML}
-    </div>` : ""}
-
-    ${topLossProfiles.length ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;font-size:13px;color:#e53935;">Loss Fingerprints (most repeated losing profiles)</div>
-      <div style="font-size:12px;color:#888;margin-bottom:10px;">These are your most repeated exact losing setups — grade, confidence, and missing rules.</div>
-      ${profileCards}
-    </div>` : ""}
-    `;
-  })();
-
-  // ── PLAYBOOK: best setup detection ──
-  const playbookHTML = (() => {
-    if (trades.length < 3) return "";
-
-    // Score each unique combo: pair × tradeType × checklist conditions
-    const comboMap = {};
-    trades.forEach(t => {
-      const pair = t.pair || "–";
-      const type = t.tradeType || "Any";
-      const cl   = t.checklist || {};
-      const condKey = ["sweep","ifvg","valid","target","pd","momentum"]
-        .filter(k => cl[k]).join("+") || "none";
-      const key = `${pair}|${type}|${condKey}`;
-      if (!comboMap[key]) comboMap[key] = { pair, type, conditions: condKey, wins:0, losses:0, total:0 };
-      comboMap[key].total++;
-      if (t.result === "Win")  comboMap[key].wins++;
-      if (t.result === "Loss") comboMap[key].losses++;
-    });
-
-    // Filter: min 2 trades, rank by win rate then sample size
-    const candidates = Object.values(comboMap)
-      .filter(c => c.total >= 2)
-      .map(c => ({ ...c, wr: Math.round(c.wins / c.total * 100) }))
-      .sort((a,b) => b.wr - a.wr || b.total - a.total);
-
-    if (!candidates.length) return "";
-    const best = candidates[0];
-
-    // Checklist alignment score for best setup
-    const condLabels = {
-      sweep:"BSL/SSL Swept", ifvg:"IFVG Identified", valid:"Valid Entry",
-      target:"Clear DOL", pd:"Correct P/D", momentum:"No Chop"
-    };
-    const condList = best.conditions === "none" ? []
-      : best.conditions.split("+").map(k => condLabels[k] || k);
-
-    const wrColor = best.wr >= 70 ? "#4caf50" : best.wr >= 50 ? "#ffa726" : "#e53935";
-
-    // Runner-up setups (top 3 excluding #1)
-    const runners = candidates.slice(1, 4);
-    const runnerRows = runners.map(r => {
-      const c = r.wr >= 70 ? "#4caf50" : r.wr >= 50 ? "#ffa726" : "#e53935";
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2b0f14;">
-        <span style="font-size:13px;color:#ccc;">${r.pair} &nbsp;·&nbsp; ${r.type} &nbsp;·&nbsp; ${r.conditions === "none" ? "No checklist" : r.conditions.split("+").length + " conditions"}</span>
-        <span style="font-weight:bold;color:${c};">${r.wr}% <span style="font-size:11px;color:#666;">(${r.total})</span></span>
-      </div>`;
-    }).join("");
-
-    return `
-    <hr class="divider">
-    <div class="section-title" style="margin-top:0;color:#f5c842;">📖 Your Playbook</div>
-    <div style="max-width:700px;margin:0 auto;padding:0 16px;">
-
-      <!-- Best setup card -->
-      <div style="background:#0d2a1a;border:2px solid #4caf50;border-radius:12px;padding:20px 24px;margin-bottom:20px;text-align:left;">
-        <div style="font-size:11px;color:#4caf50;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:bold;">Best Setup — Stack the deck with this</div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Pair</div>
-            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.pair}</div>
-          </div>
-          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Type</div>
-            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.type}</div>
-          </div>
-          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Win Rate</div>
-            <div style="font-size:20px;font-weight:bold;color:${wrColor};">${best.wr}%</div>
-          </div>
-          <div style="background:#0a1f12;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Sample</div>
-            <div style="font-size:20px;font-weight:bold;color:#fff;">${best.wins}W / ${best.losses}L</div>
-          </div>
-        </div>
-        ${condList.length ? `
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Conditions required</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">
-          ${condList.map(c => `<span style="background:#1b4d1e;color:#81c784;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;">✓ ${c}</span>`).join("")}
-        </div>` : ""}
-      </div>
-
-      ${runners.length ? `
-      <div style="background:#1e0d10;border-radius:10px;padding:14px 18px;text-align:left;">
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Other Strong Setups</div>
-        ${runnerRows}
-      </div>` : ""}
-    </div>`;
-  })();
-
-  // ── WHEN NOT TO TRADE: data-driven rules ──
-  const noTradeHTML = (() => {
-    if (trades.length < 4) return "";
-    const rules = [];
-
-    // 1. Low confidence loss rate
-    const confTrades2 = trades.filter(t => t.confidence);
-    if (confTrades2.length >= 3) {
-      [4, 5].forEach(thresh => {
-        const low = confTrades2.filter(t => t.confidence <= thresh);
-        if (low.length >= 2) {
-          const lossRate = Math.round(low.filter(t => t.result === "Loss").length / low.length * 100);
-          if (lossRate >= 55) {
-            rules.push({
-              text: `Trades with confidence <strong>≤ ${thresh}/10</strong> have a <strong style="color:#e53935;">${lossRate}% loss rate</strong> (${low.length} trades).`,
-              rule: `Skip any trade where your conviction is ${thresh}/10 or below.`,
-              severity: lossRate >= 70 ? "high" : "med"
-            });
-            return; // only show the strongest threshold
-          }
-        }
-      });
-    }
-
-    // 2. No sweep loss rate
-    const withCL2 = trades.filter(t => t.checklist);
-    if (withCL2.length >= 3) {
-      const noSweep = withCL2.filter(t => !t.checklist.sweep);
-      if (noSweep.length >= 2) {
-        const lr = Math.round(noSweep.filter(t => t.result === "Loss").length / noSweep.length * 100);
-        if (lr >= 50) rules.push({
-          text: `Trades taken <strong>without a BSL/SSL sweep</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${noSweep.length} trades).`,
-          rule: `No sweep = no trade. Non-negotiable.`,
-          severity: lr >= 70 ? "high" : "med"
-        });
-      }
-
-      // 3. No IFVG loss rate
-      const noIFVG = withCL2.filter(t => t.checklist.sweep && !t.checklist.ifvg);
-      if (noIFVG.length >= 2) {
-        const lr = Math.round(noIFVG.filter(t => t.result === "Loss").length / noIFVG.length * 100);
-        if (lr >= 55) rules.push({
-          text: `Trades with sweep but <strong>no IFVG</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${noIFVG.length} trades).`,
-          rule: `If you can't identify a clear IFVG, wait for one or skip the trade.`,
-          severity: lr >= 70 ? "high" : "med"
-        });
-      }
-
-      // 4. Invalid entry (no valid even with sweep+IFVG)
-      const noValid = withCL2.filter(t => t.checklist.sweep && t.checklist.ifvg && !t.checklist.valid);
-      if (noValid.length >= 2) {
-        const lr = Math.round(noValid.filter(t => t.result === "Loss").length / noValid.length * 100);
-        if (lr >= 55) rules.push({
-          text: `Trades with sweep + IFVG but <strong>invalid entry</strong> lose <strong style="color:#e53935;">${lr}%</strong> (${noValid.length} trades).`,
-          rule: `Wait for inversion before the next internal level — if entry isn't valid, pass.`,
-          severity: lr >= 70 ? "high" : "med"
-        });
-      }
-    }
-
-    // 5. B/C grade loss rate
-    const lowGrade = trades.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
-    if (lowGrade.length >= 2) {
-      const lr = Math.round(lowGrade.filter(t => t.result === "Loss").length / lowGrade.length * 100);
-      if (lr >= 55) rules.push({
-        text: `<strong>B/C grade setups</strong> lose <strong style="color:#e53935;">${lr}%</strong> of the time (${lowGrade.length} trades).`,
-        rule: `Minimum grade = B+. Below that, sit on your hands.`,
-        severity: lr >= 70 ? "high" : "med"
-      });
-    }
-
-    // 6. Loss after a loss (next trade after a loss)
-    let afterLossTotal = 0, afterLossLosses = 0;
-    for (let i = 1; i < trades.length; i++) {
-      if (trades[i-1].result === "Loss") {
-        afterLossTotal++;
-        if (trades[i].result === "Loss") afterLossLosses++;
-      }
-    }
-    if (afterLossTotal >= 3) {
-      const lr = Math.round(afterLossLosses / afterLossTotal * 100);
-      if (lr >= 55) rules.push({
-        text: `Your trade <strong>immediately after a loss</strong> loses <strong style="color:#e53935;">${lr}%</strong> of the time (${afterLossTotal} instances).`,
-        rule: `After a loss: step away for at least 30 minutes before considering another entry.`,
-        severity: lr >= 70 ? "high" : "med"
-      });
-    }
-
-    // 7. Pair-specific if a pair loses way more than average
-    pairStats.forEach(p => {
-      if (p.total < 3) return;
-      const pLR = Math.round(p.losses / p.total * 100);
-      const overall = Math.round(losses.length / total * 100);
-      if (pLR >= 60 && pLR >= overall + 20) {
-        rules.push({
-          text: `<strong>${p.pair}</strong> has a <strong style="color:#e53935;">${pLR}% loss rate</strong> — ${pLR - overall}% worse than your overall average.`,
-          rule: `Consider reducing size on ${p.pair} until you understand what's going wrong.`,
-          severity: pLR >= 75 ? "high" : "med"
-        });
-      }
-    });
-
-    if (!rules.length) return "";
-
-    const ruleCards = rules.map(r => {
-      const borderColor = r.severity === "high" ? "#e53935" : "#ffa726";
-      const badge = r.severity === "high"
-        ? `<span style="background:#e53935;color:#fff;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;margin-left:8px;">HIGH RISK</span>`
-        : `<span style="background:#5a3500;color:#ffa726;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;margin-left:8px;">AVOID</span>`;
-      return `<div style="background:#1e0d10;border-left:3px solid ${borderColor};border-radius:8px;padding:14px 16px;margin-bottom:10px;text-align:left;">
-        <div style="font-size:14px;line-height:1.6;margin-bottom:8px;">${r.text} ${badge}</div>
-        <div style="font-size:12px;color:#ffa726;font-weight:bold;">→ ${r.rule}</div>
-      </div>`;
-    }).join("");
-
-    return `
-    <hr class="divider">
-    <div class="section-title" style="margin-top:0;color:#e53935;">🚫 When NOT to Trade</div>
-    <div style="font-size:12px;color:#888;text-align:center;margin:-8px 0 16px;">Generated from your actual trade data. These are real patterns, not generic advice.</div>
-    <div style="max-width:700px;margin:0 auto;padding:0 16px;">
-      ${ruleCards}
-    </div>`;
-  })();
-
-  // ── PATTERN INSIGHTS HTML ──
-  const patternInsightsHTML = (() => {
-    const good    = patternEngine.filter(p => p.type === "good");
-    const warning = patternEngine.filter(p => p.type === "warning");
-    if (!good.length && !warning.length) return "";
-
-    function card(p, color) {
-      const vsLine = p.vsWR !== null
-        ? ` <span style="font-size:11px;color:#888;">vs ${p.vsWR}% other</span>`
-        : "";
-      return `<div class="bar-group">
-        <div class="bar-label">
-          <span style="font-weight:bold;">${p.label}</span>
-          <span style="font-size:11px;color:#aaa;">${p.wins}W / ${p.losses}L &nbsp;·&nbsp; ${p.count} trades</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${p.wr}%;background:${color};"></div></div>
-        <div style="font-size:11px;margin-top:2px;"><strong style="color:${color};">${p.wr}% WR</strong>${vsLine}</div>
-      </div>`;
-    }
-
-    return `
-    <div class="section" style="max-width:760px;">
-      <div class="section-title" style="margin-top:8px;">Pattern Insights <span style="font-size:10px;color:#666;">(min 3 trades · pair × type × checklist × confidence)</span></div>
-      <div class="word-cols">
-        ${good.length ? `
-        <div class="word-col">
-          <div class="word-col-title" style="color:#4caf50;">Strong Setup Patterns</div>
-          <div style="font-size:11px;color:#888;margin-bottom:10px;">Combinations with high win rates from your actual trade history.</div>
-          ${good.slice(0, 6).map(p => card(p, "#4caf50")).join("")}
-        </div>` : ""}
-        ${warning.length ? `
-        <div class="word-col">
-          <div class="word-col-title" style="color:#e53935;">Weak Setup Patterns</div>
-          <div style="font-size:11px;color:#888;margin-bottom:10px;">These combinations keep losing — identify what's different and cut them.</div>
-          ${warning.slice(0, 6).map(p => card(p, "#e53935")).join("")}
-        </div>` : ""}
-      </div>
-    </div>`;
-  })();
-
-  content.innerHTML = `
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-label">Total Trades</div>
-        <div class="stat-value">${total}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Win Rate</div>
-        <div class="stat-value" style="color:#4caf50;">${winRate}%</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Wins</div>
-        <div class="stat-value" style="color:#4caf50;">${wins.length}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Losses</div>
-        <div class="stat-value" style="color:#e53935;">${losses.length}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">BE</div>
-        <div class="stat-value" style="color:#42a5f5;">${bes.length}</div>
-      </div>
-      ${aPlusRate !== null ? `<div class="stat-card">
-        <div class="stat-label">A/A+ Rate</div>
-        <div class="stat-value" style="color:#4caf50;">${aPlusRate}%</div>
-      </div>` : ""}
-      ${avgQS !== null ? `<div class="stat-card">
-        <div class="stat-label">Avg Quality</div>
-        <div class="stat-value" style="color:${qsColor(parseFloat(avgQS))};">${avgQS}<span style="font-size:13px;color:#888;">/10</span></div>
-      </div>` : ""}
-    </div>
-
-    <!-- Overview bars -->
-    <div class="section" style="margin-top:28px;">
-      <div class="section-title">Overview</div>
-      ${barRow("Wins", wins.length, "win")}
-      ${barRow("Losses", losses.length, "loss")}
-      ${barRow("Break Even", bes.length, "be")}
-    </div>
-
-    <!-- By pair -->
-    <div class="section">
-      <div class="section-title" style="margin-top:8px;">By Pair &nbsp;<span style="font-size:11px;color:#4caf50;">■</span> Win &nbsp;<span style="font-size:11px;color:#e53935;">■</span> Loss &nbsp;<span style="font-size:11px;color:#42a5f5;">■</span> BE</div>
-      ${pairBars}
-    </div>
-
-    <!-- By setup grade -->
-    ${gradeBars ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;">By Setup Grade</div>
-      ${gradeBars}
-    </div>` : ""}
-
-    <!-- By trade model -->
-    ${modelBars ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;">By Trade Model</div>
-      ${modelBars}
-    </div>` : ""}
-
-    <!-- Quality score breakdown -->
-    ${(avgQSWin !== null || avgQSLoss !== null) ? `<div class="section">
-      <div class="section-title" style="margin-top:8px;">Quality Score Breakdown <span style="font-size:11px;color:#888;">(checklist 0–6 pts + confidence 0–4 pts)</span></div>
-      ${avgQSWin  !== null ? `<div class="bar-group"><div class="bar-label"><span style="color:#4caf50;">Wins &nbsp;— avg QS</span><span style="color:#4caf50;font-weight:bold;">${avgQSWin}/10</span></div><div class="bar-track"><div class="bar-fill win" style="width:${parseFloat(avgQSWin)*10}%;"></div></div></div>` : ""}
-      ${avgQSLoss !== null ? `<div class="bar-group"><div class="bar-label"><span style="color:#e53935;">Losses — avg QS</span><span style="color:#e53935;font-weight:bold;">${avgQSLoss}/10</span></div><div class="bar-track"><div class="bar-fill loss" style="width:${parseFloat(avgQSLoss)*10}%;"></div></div></div>` : ""}
-      ${avgQS     !== null ? `<div style="font-size:12px;color:#888;margin-top:6px;">Overall avg: <strong style="color:${qsColor(parseFloat(avgQS))};">${avgQS}/10</strong> across ${scoredTrades.length} rated trades</div>` : ""}
-    </div>` : ""}
-
-    ${lossDNAHTML}
-
-    ${playbookHTML}
-
-    ${noTradeHTML}
-
-    <!-- Patterns -->
-    ${insights.length ? `
-    <div class="section">
-      <div class="section-title" style="margin-top:8px;">Patterns Found</div>
-      ${insights.map(i => {
-        const border = i.level === "warning" ? "#e53935" : i.level === "good" ? "#4caf50" : "#8b3a44";
-        const icon   = i.level === "warning" ? "⚠️" : i.level === "good" ? "✅" : "ℹ️";
-        return `<div class="insight" style="border-left-color:${border};">${icon} ${i.text}</div>`;
-      }).join("")}
-    </div>` : ""}
-
-    <!-- Pattern Insights -->
-    ${patternInsightsHTML}
-
-    <!-- Loss Behaviour Patterns -->
-    ${lossNoteCategories.length ? `
-    <div class="section" style="max-width:700px;">
-      <div class="section-title" style="margin-top:8px;">Loss Behaviour Patterns <span style="font-size:10px;color:#666;">(from your journal notes · ≥30% of losses · min 2 trades)</span></div>
-      <div style="font-size:12px;color:#888;text-align:center;margin:-4px 0 14px;">Recurring patterns detected in your losing trade notes. Real data, not generic advice.</div>
-      ${lossNoteCategories.map(p => `
-      <div style="background:#1e0d10;border-left:3px solid ${p.color};border-radius:7px;padding:12px 16px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-weight:bold;font-size:14px;color:#ddd;">${p.name}</span>
-          <span style="font-weight:bold;color:${p.color};font-size:16px;">${p.pct}% of losses</span>
-        </div>
-        <div style="font-size:12px;color:#888;margin-bottom:7px;">Detected in <strong style="color:#ccc;">${p.count}</strong> of your ${losses.length} losing trades.</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${p.pct}%;background:${p.color};opacity:0.85;"></div></div>
-      </div>`).join("")}
-    </div>` : ""}
-
-    <hr class="divider">
-
-    <!-- Split patterns: Losses vs Wins -->
-    <div class="section-title" style="margin-top:0;">Patterns by Result</div>
-    <div class="pattern-split">
-
-      <!-- Loss patterns -->
-      <div class="pattern-col">
-        <div class="pattern-col-title" style="color:#e53935;">Loss Patterns</div>
-        ${(() => {
-          const lossInsights = [];
-          if (losses.length === 0) return `<div class="insight" style="border-left-color:#555;color:#aaa;">No losses logged yet.</div>`;
-
-          // Forced trade detection
-          const forcedLosses = losses.filter(t => /forced|told myself|shouldnt have|shouldn't|no trade day|shouldn't|didn't want|didnt want/i.test(t.notes||""));
-          if (forcedLosses.length >= 1) lossInsights.push(`<strong>${forcedLosses.length}</strong> loss${forcedLosses.length>1?"es":""} where you noted you <strong>shouldn't have taken the trade</strong>. Your gut was right — trust it next time.`);
-
-          // Winning day chasing
-          const winDayLosses = losses.filter(t => /winning day|win today|hoping|emotions|emotional|wanted.*win/i.test(t.notes||""));
-          if (winDayLosses.length >= 1) lossInsights.push(`<strong>${winDayLosses.length}</strong> loss${winDayLosses.length>1?"es":""} tied to <strong>chasing a winning day</strong> or emotional motivation. These are your most avoidable losses.`);
-
-          // News/FOMC
-          const newsLosses = losses.filter(t => /fomc|news|overnight|trump|fed|report|geopolit/i.test(t.notes||""));
-          if (newsLosses.length >= 1) lossInsights.push(`<strong>${newsLosses.length}</strong> loss${newsLosses.length>1?"es":""} on <strong>high-impact news days</strong>. Consider a strict no-trade rule on FOMC/major news.`);
-
-          // NY Open unswept
-          const nyLosses = losses.filter(t => /ny open|nyopen|new york open/i.test(t.notes||""));
-          if (nyLosses.length >= 1) lossInsights.push(`<strong>${nyLosses.length}</strong> loss${nyLosses.length>1?"es":""} where <strong>NY Open hadn't been swept</strong>. That level kept stopping you — make it a filter.`);
-
-          // Wrong draw/targets
-          const drawLosses = losses.filter(t => /draw.*wrong|wrong.*draw|wrong.*target|target.*wrong|delivers|delivery/i.test(t.notes||""));
-          if (drawLosses.length >= 1) lossInsights.push(`<strong>${drawLosses.length}</strong> loss${drawLosses.length>1?"es":""} from <strong>wrong draws on liquidity</strong>. Good execution, wrong target — a refinement issue not a discipline issue.`);
-
-          // Scared / low confidence
-          const scaredLosses = losses.filter(t => /scared|fear|nervous|not confident|wasn't confident|wasnt confident|size down/i.test(t.notes||""));
-          if (scaredLosses.length >= 1) lossInsights.push(`<strong>${scaredLosses.length}</strong> loss${scaredLosses.length>1?"es":""} where you noted <strong>low confidence or fear</strong>. If you're sizing down because you're unsure, that's a signal to skip the trade entirely.`);
-
-          // Shorts into strength
-          const counterLosses = losses.filter(t => /wanted short|shorts.*higher|counter|against.*trend|fighting/i.test(t.notes||""));
-          if (counterLosses.length >= 1) lossInsights.push(`<strong>${counterLosses.length}</strong> loss${counterLosses.length>1?"es":""} from <strong>fighting the trend</strong> — wanting shorts while price pushed higher. Wait for delivery, don't predict reversals.`);
-
-          // Low confidence losses
-          const lowConfLoss = losses.filter(t => t.confidence && t.confidence <= 4);
-          if (lowConfLoss.length >= 1) lossInsights.push(`<strong>${lowConfLoss.length}</strong> loss${lowConfLoss.length>1?"es":""} entered with <strong>confidence ≤ 4/10</strong>. You knew the trade felt weak — that feeling is data. Use it as a hard filter.`);
-
-          // Medium confidence losses (5-6)
-          const midConfLoss = losses.filter(t => t.confidence && t.confidence >= 5 && t.confidence <= 6);
-          if (midConfLoss.length >= 2) lossInsights.push(`<strong>${midConfLoss.length}</strong> loss${midConfLoss.length>1?"es":""} at <strong>confidence 5–6/10</strong>. Mediocre conviction = mediocre results. Raise your minimum confidence threshold.`);
-
-          // Low grade losses (B, B-, C)
-          const lowGradeLoss = losses.filter(t => t.grade && ["B","B-","C"].includes(t.grade));
-          if (lowGradeLoss.length >= 1) lossInsights.push(`<strong>${lowGradeLoss.length}</strong> loss${lowGradeLoss.length>1?"es":""} on <strong>B/C grade setups</strong>. Missing sweep, IFVG, or valid entry — below your minimum standard.`);
-
-          // No BSL/SSL sweep (rule #1 violation)
-          const noSweepL = losses.filter(t => t.checklist && !t.checklist.sweep);
-          if (noSweepL.length >= 1) lossInsights.push(`<strong>${noSweepL.length}</strong> loss${noSweepL.length>1?"es":""} taken <strong>without a liquidity sweep</strong>. Rule #1: BSL or SSL must be taken before entry. These were completely avoidable.`);
-
-          // Invalid entry (took when internal high/low already hit)
-          const invalidL = losses.filter(t => t.checklist && t.checklist.sweep && !t.checklist.valid);
-          if (invalidL.length >= 1) lossInsights.push(`<strong>${invalidL.length}</strong> loss${invalidL.length>1?"es":""} on <strong>invalid entries</strong> — inversion co-occurred with or after the internal high/low. Wait for inversion to happen first.`);
-
-          if (lossInsights.length === 0) lossInsights.push("Not enough note detail yet to detect specific loss patterns. Keep journaling.");
-
-          return lossInsights.map(t => `<div class="insight" style="border-left-color:#e53935;">⚠️ ${t}</div>`).join("");
-        })()}
-      </div>
-
-      <!-- Win patterns -->
-      <div class="pattern-col">
-        <div class="pattern-col-title" style="color:#4caf50;">Win Patterns</div>
-        ${(() => {
-          if (wins.length === 0) return `<div class="insight" style="border-left-color:#555;color:#aaa;">No wins logged yet.</div>`;
-          const winInsights = [];
-
-          // Calm/relaxed mindset wins
-          const calmWins = wins.filter(t => /calm|relaxed|chilling|chill|patient|waited|confident|good mindset|right place/i.test(t.notes||""));
-          if (calmWins.length >= 1) winInsights.push(`<strong>${calmWins.length}</strong> win${calmWins.length>1?"s":""} where you noted being <strong>calm or in the right headspace</strong>. Your best trades come when you're relaxed.`);
-
-          // Followed rules
-          const ruleWins = wins.filter(t => /followed.*rules|rules.*followed|waited.*setup|best setup|my rules/i.test(t.notes||""));
-          if (ruleWins.length >= 1) winInsights.push(`<strong>${ruleWins.length}</strong> win${ruleWins.length>1?"s":""} where you explicitly <strong>followed your rules</strong> and waited for the best setup.`);
-
-          // Strong confluence
-          const confWins = wins.filter(t => /confluence|liquidity|sweep|momentum|strong|setup|signal/i.test(t.notes||""));
-          if (confWins.length >= 1) winInsights.push(`<strong>${confWins.length}</strong> win${confWins.length>1?"s":""} with notes mentioning <strong>strong confluence or clear setups</strong> — these are your A+ trades.`);
-
-          // High confidence wins
-          const highConfWins = wins.filter(t => (t.confidence || 0) >= 8);
-          if (highConfWins.length >= 1) winInsights.push(`<strong>${highConfWins.length}</strong> win${highConfWins.length>1?"s":""} logged with <strong>confidence 8+/10</strong>. High conviction trades are performing.`);
-
-          // Average confidence on wins
-          const confWinSet = wins.filter(t => t.confidence);
-          if (confWinSet.length >= 2) {
-            const avgCW = (confWinSet.reduce((a,t)=>a+t.confidence,0)/confWinSet.length).toFixed(1);
-            winInsights.push(`Average confidence on your wins: <strong>${avgCW}/10</strong>. Trades above this mark tend to pay — below it, think twice.`);
-          }
-
-          // High grade wins (A, A+)
-          const highGradeWins = wins.filter(t => t.grade && (t.grade === "A+" || t.grade === "A"));
-          if (highGradeWins.length >= 1) winInsights.push(`<strong>${highGradeWins.length}</strong> win${highGradeWins.length>1?"s":""} on <strong>A/A+ grade setups</strong> — full checklist met. This is the blueprint.`);
-
-          // Most common winning grade
-          const gradeWinCount = {};
-          wins.filter(t=>t.grade).forEach(t => { gradeWinCount[t.grade] = (gradeWinCount[t.grade]||0)+1; });
-          const bestGrade = Object.entries(gradeWinCount).sort((a,b)=>b[1]-a[1])[0];
-          if (bestGrade && bestGrade[1] >= 2) winInsights.push(`Your most common winning grade is <strong>${bestGrade[0]}</strong> (${bestGrade[1]} wins). Focus your entries here.`);
-
-          if (winInsights.length === 0) winInsights.push("Keep adding detailed notes to your wins — patterns will surface here as you journal more.");
-
-          return winInsights.map(t => `<div class="insight" style="border-left-color:#4caf50;">✅ ${t}</div>`).join("");
-        })()}
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- Tabbed journals -->
-    <div class="section-title" style="margin-top:0;">Journals</div>
-    <div class="journal-tabs">
-      <button class="jtab active" onclick="filterJournals('all',this)">All</button>
-      <button class="jtab" onclick="filterJournals('win',this)">Wins</button>
-      <button class="jtab" onclick="filterJournals('loss',this)">Losses</button>
-      <button class="jtab" onclick="filterJournals('be',this)">BE</button>
-    </div>
-    <div class="trade-list" id="journal-list"></div>
-  `;
-
-  // ── Grade helpers (mirrored from journal) ──
+  // ── Setup grade (based on iFVG strategy) ──
+  // Rule #1: BSL/SSL must be swept. No sweep = C (forced trade)
   function calcGrade(c) {
     const { sweep, ifvg, valid, target, pd, momentum } = c;
     if (sweep && ifvg && momentum && valid && target && pd) return "A+";
@@ -1558,6 +916,7 @@ try {
     if (sweep)                                              return "B-";
     return "C";
   }
+
   function gradeColor(g) {
     if (g === "A+") return "#4caf50";
     if (g === "A")  return "#66bb6a";
@@ -1568,64 +927,157 @@ try {
     return "#b71c1c";
   }
 
-  // ── Journal card renderer ──
-  function buildJournalCards(filter) {
-    const list = document.getElementById("journal-list");
-    if (!list) return;
-    const filtered = filter === "all" ? trades : trades.filter(t => t.result.toLowerCase() === filter);
+  const checkIds = ["c-sweep","c-ifvg","c-valid","c-target","c-pd","c-momentum"];
+
+  function getChecklist() {
+    return {
+      sweep:    document.getElementById("c-sweep").checked,
+      ifvg:     document.getElementById("c-ifvg").checked,
+      valid:    document.getElementById("c-valid").checked,
+      target:   document.getElementById("c-target").checked,
+      pd:       document.getElementById("c-pd").checked,
+      momentum: document.getElementById("c-momentum").checked,
+    };
+  }
+
+  function updateGradeLive() {
+    const c = getChecklist();
+    const anyChecked = Object.values(c).some(Boolean);
+    const grade = anyChecked ? calcGrade(c) : "—";
+    const badge = document.getElementById("grade-live");
+    badge.textContent = grade;
+    badge.style.color = anyChecked ? gradeColor(grade) : "#555";
+  }
+
+  checkIds.forEach(id => {
+    document.getElementById(id).addEventListener("change", updateGradeLive);
+  });
+
+  function setTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    const map = { All: 0, Win: 1, Loss: 2, BE: 3 };
+    document.querySelectorAll(".tab")[map[tab]].classList.add("active");
+    renderTrades();
+  }
+
+  function processImageFile(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        const maxW = 1200;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        pendingImage = canvas.toDataURL("image/jpeg", 0.8);
+        document.getElementById("preview-img").src = pendingImage;
+        document.getElementById("preview").style.display = "block";
+        document.getElementById("file-label-text").textContent = "📎 " + (file.name || "pasted image");
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Click to pick file
+  document.getElementById("image").addEventListener("change", function () {
+    processImageFile(this.files[0]);
+  });
+
+  // Drag & drop
+  const dropZone = document.querySelector(".file-label");
+  dropZone.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    this.classList.add("drag-over");
+  });
+  dropZone.addEventListener("dragleave", function () {
+    this.classList.remove("drag-over");
+  });
+  dropZone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    this.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    processImageFile(file);
+  });
+
+  // Paste (Ctrl+V anywhere on page)
+  document.addEventListener("paste", function (e) {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        processImageFile(item.getAsFile());
+        break;
+      }
+    }
+  });
+
+  function renderTrades() {
+    const container = document.getElementById("trades");
+    container.innerHTML = "";
+
+    const filtered = activeTab === "All" ? trades : trades.filter(t => t.result === activeTab);
+
     if (filtered.length === 0) {
-      list.innerHTML = `<p style="color:#aaa;font-size:14px;text-align:center;">No ${filter === "all" ? "" : filter} trades yet.</p>`;
+      container.innerHTML = `<p style="color:#aaa;font-size:14px;">No ${activeTab === "All" ? "" : activeTab + " "}trades yet.</p>`;
       return;
     }
+
     const resultColor = { Win: "#4caf50", Loss: "#e53935", BE: "#42a5f5" };
-    const borderClass  = { Win: "win-trade", Loss: "loss-trade", BE: "be-trade" };
-    const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
-    const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
-    list.innerHTML = [...filtered].reverse().map(t => {
+
+    [...filtered].reverse().forEach((t) => {
+      const index = trades.indexOf(t);
+      const colorClass = t.result === "Win" ? "win-trade" : t.result === "Loss" ? "loss-trade" : "be-trade";
+      const imgHTML = t.image
+        ? `<img src="${t.image}" alt="chart" onclick="openLightbox(${index})">`
+        : "";
       const color = resultColor[t.result] || "white";
-      const cls   = borderClass[t.result] || "";
-      const imgHTML = t.image ? `<img src="${t.image}" alt="chart" onclick="openLightbox('${t.image.replace(/'/g,"\\'")}')">` : "";
+
       const conf = t.confidence;
       const confColor = conf >= 8 ? "#4caf50" : conf >= 5 ? "#ffa726" : conf ? "#e53935" : "#555";
       const confLabel = conf ? `${conf}/10` : "—/10";
-      const qs = qualityScore(t);
-      const qsHTML = qs !== null
-        ? ` &nbsp;|&nbsp; QS: <span style="color:${qsColor(qs)};font-weight:bold;">${qs}/10</span>`
-        : "";
+
+      const clChecked = t.checklist ? ["sweep","ifvg","valid","target","pd","momentum"].filter(k => t.checklist[k]).length : null;
+      const qs = (clChecked !== null || t.confidence)
+        ? Math.round(((clChecked || 0) / 6) * 6 + ((t.confidence || 0) / 10) * 4)
+        : null;
+      const qsCol = qs !== null ? (qs >= 8 ? "#4caf50" : qs >= 5 ? "#ffa726" : "#e53935") : "#555";
+      const qsHTML = qs !== null ? ` &nbsp;|&nbsp; QS: <span style="color:${qsCol};font-weight:bold;">${qs}/10</span>` : "";
+
       const gradeHTML = t.grade
         ? `<span style="color:${gradeColor(t.grade)};font-weight:bold;font-size:12px;background:#1a0a0c;padding:1px 7px;border-radius:4px;margin-left:6px;">${t.grade}</span>`
         : "";
       const typeHTML = t.tradeType
         ? `<span style="font-size:10px;color:#888;margin-left:6px;">${t.tradeType}</span>`
         : "";
+
+      const clKeys   = ["sweep","ifvg","valid","target","pd","momentum"];
+      const clLabels = ["BSL/SSL Swept","IFVG","Valid Entry","Clear DOL","Correct P/D","No Chop"];
       const checklistHTML = t.checklist
         ? `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px;">` +
           clKeys.map((k,i) =>
             `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${t.checklist[k]?"#1b4d1e":"#2b1015"};color:${t.checklist[k]?"#81c784":"#555"};">${t.checklist[k]?"✓":"✗"} ${clLabels[i]}</span>`
           ).join("") + `</div>`
         : "";
-      const idx = trades.indexOf(t);
-      return `
-        <div class="trade ${cls}" onclick="openDetailPanel(${idx})">
+
+      container.innerHTML += `
+        <div class="trade ${colorClass}" onclick="openDetailPanel(${index})">
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteTrade(${index})">✕</button>
           <div class="trade-date">${t.datetime || "No date"}</div>
           <strong>${t.pair}</strong> - <span style="color:${color};font-weight:bold;">${t.result}</span>${gradeHTML}${typeHTML}<br>
           RR: ${t.rr || "—"} &nbsp;|&nbsp; Confidence: <span style="color:${confColor};font-weight:bold;">${confLabel}</span>${qsHTML}
           ${checklistHTML}
-          <div style="margin-top:8px;">${t.notes || ""}</div>
+          <div style="margin-top:8px;">${t.notes}</div>
           ${imgHTML}
-        </div>`;
-    }).join("");
+        </div>
+      `;
+    });
   }
 
-  buildJournalCards("all");
-
-  window.filterJournals = function(type, btn) {
-    document.querySelectorAll(".jtab").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    buildJournalCards(type);
-  };
-
-  // ── Trade detail panel ──
   function openDetailPanel(index) {
     const t = trades[index];
     if (!t) return;
@@ -1658,6 +1110,7 @@ try {
 
     const formatNotes = (raw) => {
       const labelMap = [
+        { key: "Why I entered",         display: "Why did you enter this trade?" },
         { key: "Aligned with analysis", display: "Was the trade aligned with analysis?" },
         { key: "Rules followed",        display: "Were your rules followed?" },
         { key: "Mindset",               display: "What was your mindset coming into the market?" },
@@ -1677,11 +1130,11 @@ try {
 
     const notesHTML = t.notes
       ? `<div class="detail-section-title">Notes</div>
-         <div class="detail-notes">${formatNotes(t.notes)}</div>`
+         <div class="detail-notes" style="background:#2b0f14;border-radius:7px;padding:14px 16px;">${formatNotes(t.notes)}</div>`
       : "";
 
     const imgHTML = t.image
-      ? `<img class="detail-img" src="${t.image}" alt="chart" onclick="openLightbox('${t.image.replace(/'/g,"\\'")}')">`
+      ? `<img class="detail-img" src="${t.image}" alt="chart" onclick="openLightbox(${index})">`
       : "";
 
     document.getElementById("detail-body").innerHTML = `
@@ -1702,6 +1155,10 @@ try {
       ${clHTML}
       ${notesHTML}
       ${imgHTML}
+      <div style="margin-top:18px;display:flex;gap:8px;">
+        <button onclick="event.stopPropagation(); editDatetime(${index})" style="flex:1;font-size:12px;padding:8px;background:#2b0f14;color:#aaa;border:none;border-radius:6px;cursor:pointer;margin:0;">Edit Date</button>
+        <button onclick="event.stopPropagation(); editConfidenceFromPanel(${index})" style="flex:1;font-size:12px;padding:8px;background:#2b0f14;color:#aaa;border:none;border-radius:6px;cursor:pointer;margin:0;">Edit Confidence</button>
+      </div>
     `;
 
     document.getElementById("detail-panel").classList.add("open");
@@ -1712,514 +1169,113 @@ try {
     document.getElementById("detail-panel").classList.remove("open");
     document.getElementById("detail-overlay").classList.remove("open");
   }
-} catch(e) {
-  content.innerHTML = `<div style="padding:40px;color:#e53935;font-family:monospace;font-size:13px;text-align:left;max-width:800px;margin:0 auto;"><strong>JavaScript Error — please report this:</strong><br><br>${e.message}<br><br><pre style="white-space:pre-wrap;font-size:11px;color:#aaa;background:#1a0a0c;padding:12px;border-radius:6px;">${e.stack}</pre><div style="margin-top:16px;font-size:12px;color:#888;">Open DevTools (F12 → Console) for full details.</div></div>`;
-}
-}
-</script>
 
-<script>
-// ════════════════════════════════════════════════════════════════
-//  ANALYTICS ENGINE  (Features 1–5 + Enhancements)
-//  All functions are pure JS, no external deps.
-// ════════════════════════════════════════════════════════════════
-
-// ── RR parser (shared by all modules) ───────────────────────────
-function parseRR(rr) {
-  if (rr === null || rr === undefined) return null;
-  const s = String(rr).trim();
-  if (!s) return null;
-  const ci = s.indexOf(":");
-  if (ci !== -1) {
-    const risk = parseFloat(s.slice(0, ci)), reward = parseFloat(s.slice(ci + 1));
-    if (isNaN(risk) || isNaN(reward) || risk === 0) return null;
-    return reward / risk;
-  }
-  const v = parseFloat(s);
-  return isNaN(v) ? null : v;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  FEATURE 1 — Pattern Statistics Engine
-// ════════════════════════════════════════════════════════════════
-function generatePatternStats(trades) {
-  if (!Array.isArray(trades) || trades.length === 0) return [];
-
-  function buildStats(label, subset, category) {
-    if (subset.length < 3) return null;
-    const wins   = subset.filter(t => t.result === "Win").length;
-    const losses = subset.filter(t => t.result === "Loss").length;
-    const bes    = subset.filter(t => t.result === "BE").length;
-    return { label, total: subset.length, wins, losses, bes,
-             winRate: Math.round((wins / subset.length) * 100), category };
+  function editConfidenceFromPanel(index) {
+    const current = trades[index].confidence || "";
+    const input = prompt("Confidence level (1–10):", current);
+    if (input === null) return;
+    const num = parseInt(input);
+    if (isNaN(num) || num < 1 || num > 10) { alert("Enter a number between 1 and 10."); return; }
+    trades[index].confidence = num;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+    openDetailPanel(index);
   }
 
-  function confBucket(c) {
-    if (c <= 4) return "Confidence ≤4";
-    if (c <= 6) return "Confidence 5–6";
-    if (c <= 8) return "Confidence 7–8";
-    return "Confidence 9–10";
-  }
+  function addTrade() {
+    const pair = document.getElementById("pair").value;
+    const result = document.getElementById("result").value;
+    const rr = document.getElementById("rr").value;
 
-  const results = [];
-  const push = p => { if (p) results.push(p); };
-
-  [...new Set(trades.map(t => t.pair).filter(Boolean))].forEach(p =>
-    push(buildStats(`${p} trades`, trades.filter(t => t.pair === p), "pair")));
-
-  [...new Set(trades.map(t => t.tradeType).filter(Boolean))].forEach(tt =>
-    push(buildStats(`${tt} trades`, trades.filter(t => t.tradeType === tt), "tradeType")));
-
-  [...new Set(trades.map(t => t.grade).filter(Boolean))].forEach(g =>
-    push(buildStats(`Grade ${g}`, trades.filter(t => t.grade === g), "grade")));
-
-  ["Confidence ≤4","Confidence 5–6","Confidence 7–8","Confidence 9–10"].forEach(b =>
-    push(buildStats(b, trades.filter(t => typeof t.confidence === "number" && confBucket(t.confidence) === b), "confidence")));
-
-  ["sweep","ifvg","valid","target","pd","momentum"].forEach(k => {
-    push(buildStats(`${k} present`, trades.filter(t => t.checklist && t.checklist[k] === true), "checklist"));
-    push(buildStats(`${k} absent`,  trades.filter(t => !t.checklist || t.checklist[k] !== true), "checklist"));
-  });
-
-  results.sort((a, b) => b.winRate - a.winRate);
-  return results;
-}
-
-function renderPatternStats(patterns) {
-  if (!Array.isArray(patterns) || patterns.length === 0)
-    return `<div style="color:#888;padding:16px;">No pattern data yet — add more trades.</div>`;
-
-  const barColor = wr => wr >= 65 ? "#22c55e" : wr >= 40 ? "#f97316" : "#ef4444";
-  const catLabels = { pair:"By Instrument", tradeType:"By Trade Type", grade:"By Grade",
-                      confidence:"By Confidence", checklist:"By Checklist Condition" };
-
-  const cats = [...new Set(patterns.map(p => p.category))];
-  let html = `<div style="font-family:sans-serif;background:#1e0d10;padding:20px;border-radius:10px;max-width:660px;margin:0 auto;">`;
-
-  cats.forEach(cat => {
-    const group = patterns.filter(p => p.category === cat);
-    html += `<div style="margin-bottom:20px;">
-      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${catLabels[cat] || cat}</div>`;
-    group.forEach(p => {
-      const c = barColor(p.winRate);
-      const be = p.bes > 0 ? ` / ${p.bes} BE` : "";
-      html += `<div style="margin-bottom:8px;padding:9px 12px;background:#2d1218;border-radius:6px;border-left:3px solid ${c};">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-          <span style="font-size:13px;font-weight:600;color:#f5f5f5;text-transform:capitalize;">${p.label}</span>
-          <span style="font-size:11px;color:#aaa;">${p.wins}W / ${p.losses}L${be} · ${p.total} trades</span>
-        </div>
-        <div style="background:#3d1a22;border-radius:3px;height:8px;overflow:hidden;">
-          <div style="width:${Math.max(p.winRate, 2)}%;height:100%;background:${c};border-radius:3px;"></div>
-        </div>
-        <div style="font-size:11px;color:${c};font-weight:700;text-align:right;margin-top:3px;">${p.winRate}% WR</div>
-      </div>`;
-    });
-    html += `</div>`;
-  });
-  html += `</div>`;
-  return html;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  FEATURE 2 — Trade Replay Analyzer
-// ════════════════════════════════════════════════════════════════
-function analyzeTrade(trade) {
-  if (trade == null) return { message: "No trade data provided.", severity: "info" };
-  const { checklist, confidence, grade, result } = trade;
-
-  if (checklist != null && checklist.sweep === false)
-    return { message: "Trade taken without liquidity sweep — Rule #1 violated.", severity: "warning" };
-
-  if (confidence != null && confidence <= 4)
-    return { message: "Low confidence trade detected (≤4/10) — high risk entry.", severity: "warning" };
-
-  if (grade != null && (grade === "B" || grade === "B-" || grade === "C"))
-    return { message: `Low-quality setup (Grade ${grade}) — below minimum standard.`, severity: "warning" };
-
-  if (result === "Loss" && checklist != null && checklist.valid === false)
-    return { message: "Invalid entry detected — entry was not valid (inversion not confirmed).", severity: "warning" };
-
-  const full = checklist != null && checklist.sweep && checklist.ifvg && checklist.valid &&
-               checklist.target && checklist.pd && checklist.momentum;
-  if (full && (confidence == null || confidence >= 8) && (grade == null || grade === "A+" || grade === "A"))
-    return { message: "A+ execution — full checklist, high conviction, clean setup.", severity: "good" };
-
-  return { message: "Valid trade execution.", severity: "info" };
-}
-
-function renderTradeAnalysis(trade) {
-  const { message, severity } = analyzeTrade(trade);
-  const S = { warning: { border:"#ffa726", text:"#e53935", label:"Warning" },
-               good:    { border:"#4caf50", text:"#4caf50", label:"Good" },
-               info:    { border:"#42a5f5", text:"#42a5f5", label:"Info" } };
-  const { border, text, label } = S[severity] || S.info;
-  return `<div style="background:#1e0d10;border-left:3px solid ${border};border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:13px;line-height:1.4;">
-    <span style="color:${border};font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.08em;display:block;margin-bottom:3px;">${label}</span>
-    <span style="color:${text};">${message}</span>
-  </div>`;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  FEATURE 3 — Core Analytics Metrics
-// ════════════════════════════════════════════════════════════════
-function calculateWinRate(trades) {
-  if (!Array.isArray(trades) || !trades.length) return 0;
-  const wins = trades.filter(t => t.result === "Win").length;
-  const total = wins + trades.filter(t => t.result === "Loss").length;
-  return total === 0 ? 0 : Math.round((wins / total) * 100);
-}
-
-function calculateExpectancy(trades) {
-  if (!Array.isArray(trades) || !trades.length) return null;
-  const wins = trades.filter(t => t.result === "Win");
-  const losses = trades.filter(t => t.result === "Loss");
-  const total = wins.length + losses.length;
-  if (!total) return null;
-  const winRRs = wins.map(t => parseRR(t.rr)).filter(v => v !== null);
-  if (!winRRs.length) return null;
-  const avgWin  = winRRs.reduce((s, v) => s + v, 0) / winRRs.length;
-  const avgLoss = losses.length ? losses.map(t => parseRR(t.rr) ?? 1).reduce((s,v) => s+v,0) / losses.length : 1;
-  return Math.round(((wins.length/total)*avgWin - (losses.length/total)*avgLoss) * 100) / 100;
-}
-
-function calculateProfitFactor(trades) {
-  if (!Array.isArray(trades) || !trades.length) return null;
-  const winSum  = trades.filter(t => t.result === "Win").reduce((s,t) => s + (parseRR(t.rr) ?? 0), 0);
-  const lossSum = trades.filter(t => t.result === "Loss").reduce((s,t) => s + (parseRR(t.rr) ?? 1), 0);
-  return lossSum === 0 ? null : Math.round((winSum / lossSum) * 100) / 100;
-}
-
-function calculateMaxLossStreak(trades) {
-  if (!Array.isArray(trades) || !trades.length) return 0;
-  let max = 0, cur = 0;
-  for (const t of trades) { t.result === "Loss" ? (cur++, max = Math.max(max, cur)) : (cur = 0); }
-  return max;
-}
-
-function calculateAverageRR(trades) {
-  if (!Array.isArray(trades) || !trades.length) return null;
-  const vals = trades.map(t => parseRR(t.rr)).filter(v => v !== null);
-  return vals.length ? Math.round(vals.reduce((s,v) => s+v, 0) / vals.length * 100) / 100 : null;
-}
-
-function renderCoreMetrics(trades) {
-  const wr  = calculateWinRate(trades);
-  const exp = calculateExpectancy(trades);
-  const pf  = calculateProfitFactor(trades);
-  const mls = calculateMaxLossStreak(trades);
-  const arr = calculateAverageRR(trades);
-  const fmt = (v, sfx="") => v === null || v === undefined ? "—" : `${v}${sfx}`;
-  const expClr = exp === null ? "#a0a0a0" : exp > 0 ? "#4ade80" : "#f87171";
-  const pfClr  = pf  === null ? "#a0a0a0" : pf  > 1 ? "#4ade80" : "#f87171";
-
-  const cards = [
-    { label:"Win Rate",        value:fmt(wr, "%"),  color:"#e2e8f0" },
-    { label:"Avg R:R",         value:fmt(arr),      color:"#e2e8f0" },
-    { label:"Expectancy",      value:fmt(exp),      color:expClr    },
-    { label:"Profit Factor",   value:fmt(pf),       color:pfClr     },
-    { label:"Max Loss Streak", value:fmt(mls),      color:"#e2e8f0" },
-  ];
-
-  const cardHTML = cards.map(({label, value, color}) =>
-    `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:#2d1117;border:1px solid #3d1f27;border-radius:8px;padding:14px 20px;min-width:110px;flex:1;">
-      <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b6370;margin-bottom:7px;white-space:nowrap;">${label}</span>
-      <span style="font-size:26px;font-weight:700;color:${color};line-height:1;">${value}</span>
-    </div>`
-  ).join("");
-
-  return `<div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px;background:#1e0d10;border-radius:10px;font-family:system-ui,sans-serif;">${cardHTML}</div>`;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  FEATURE 4 — Insight Generator
-// ════════════════════════════════════════════════════════════════
-function generateInsights(trades) {
-  if (!Array.isArray(trades) || trades.length < 3) return [];
-  const insights = [];
-  const isWin  = t => t?.result === "Win";
-  const isLoss = t => t?.result === "Loss";
-  const wr = arr => arr.length ? arr.filter(isWin).length / arr.length : 0;
-  const _rr = rr => { if (!rr) return 1; const s = String(rr).trim(); if (s.includes(":")) { const [r,w]=s.split(":"); return isNaN(+r)||+r===0?1:+w/+r; } return isNaN(+s)?1:+s; };
-
-  // 1. Losing streak
-  let streak = 0;
-  for (let i = trades.length - 1; i >= 0; i--) { if (isLoss(trades[i])) streak++; else break; }
-  if (streak >= 4) insights.push({ message:`You are on a <strong>${streak}-trade losing streak</strong>. Step back and review before your next trade.`, severity:"warning", category:"streak" });
-  else if (streak >= 2) insights.push({ message:`Current losing streak: <strong>${streak} trades</strong>. Stay disciplined.`, severity:"warning", category:"streak" });
-
-  // 2. Low confidence losses
-  const losses = trades.filter(isLoss);
-  const lcl = losses.filter(t => t.confidence != null && t.confidence <= 5);
-  if (losses.filter(t=>t.confidence!=null).length >= 2) {
-    const pct = Math.round(lcl.length / losses.filter(t=>t.confidence!=null).length * 100);
-    if (pct >= 40) insights.push({ message:`<strong>${pct}%</strong> of your losses had confidence ≤5. Low-confidence trades are costing you.`, severity:"warning", category:"confidence" });
-  }
-
-  // 3. No sweep violations
-  const noSweep = trades.filter(t => isLoss(t) && t.checklist != null && t.checklist.sweep === false);
-  if (noSweep.length >= 2) insights.push({ message:`<strong>${noSweep.length} losses</strong> without sweep confirmation. No sweep = no trade.`, severity:"warning", category:"rules" });
-
-  // 4+5. Best/worst pair×type combo
-  const groups = {};
-  trades.forEach(t => { if (!t.pair || !t.tradeType) return; const k=`${t.pair} ${t.tradeType}`; if (!groups[k]) groups[k]=[]; groups[k].push(t); });
-  const eligible = Object.entries(groups).filter(([,a])=>a.length>=3).map(([k,a])=>({k,wr:wr(a),n:a.length})).sort((a,b)=>b.wr-a.wr);
-  if (eligible.length) {
-    insights.push({ message:`Best setup: <strong>${eligible[0].k}</strong> — <strong>${Math.round(eligible[0].wr*100)}% WR</strong> (${eligible[0].n} trades).`, severity:"good", category:"setup" });
-    if (eligible.length >= 2) insights.push({ message:`Worst setup: <strong>${eligible[eligible.length-1].k}</strong> — <strong>${Math.round(eligible[eligible.length-1].wr*100)}% WR</strong>. Review or reduce.`, severity:"warning", category:"setup" });
-  }
-
-  // 6. Reversal vs Continuation
-  const rev  = trades.filter(t => t.tradeType === "Reversal");
-  const cont = trades.filter(t => t.tradeType === "Continuation");
-  if (rev.length >= 3 && cont.length >= 3) {
-    const rw = wr(rev), cw = wr(cont);
-    const better = rw >= cw ? "Reversal" : "Continuation";
-    insights.push({ message:`<strong>${better}</strong> trades outperform (${Math.round(Math.max(rw,cw)*100)}% vs ${Math.round(Math.min(rw,cw)*100)}%). Lean into your stronger model.`, severity:"info", category:"model" });
-  }
-
-  // 7. Grade gap
-  const hiG = trades.filter(t => t.grade === "A+" || t.grade === "A");
-  const loG = trades.filter(t => t.grade && !["A+","A"].includes(t.grade));
-  if (hiG.length >= 2 && loG.length >= 2) {
-    const diff = Math.round((wr(hiG) - wr(loG)) * 100);
-    if (diff >= 20) insights.push({ message:`A/A+ setups win <strong>${Math.round(wr(hiG)*100)}%</strong> vs <strong>${Math.round(wr(loG)*100)}%</strong> for lower grades — <strong>${diff}pp gap</strong>. Focus on A-quality entries.`, severity:"good", category:"grade" });
-  }
-
-  // 8. Profit factor
-  const wl = trades.filter(t => t.result==="Win"||t.result==="Loss");
-  if (wl.length >= 3) {
-    const ws = wl.filter(isWin).reduce((s,t)=>s+_rr(t.rr),0);
-    const ls = wl.filter(isLoss).reduce((s,t)=>s+_rr(t.rr),0);
-    if (ls > 0) {
-      const pf = (ws/ls).toFixed(2);
-      if (+pf < 1)   insights.push({ message:`Profit factor is <strong>${pf}</strong> — below 1.0. You're losing more than you win in R-terms.`, severity:"warning", category:"profitfactor" });
-      else if (+pf > 1.5) insights.push({ message:`Profit factor is <strong>${pf}</strong> — your winners outweigh your losers in R-terms.`, severity:"good", category:"profitfactor" });
+    if (!pair || !result) {
+      alert("Select pair and result");
+      return;
     }
+
+    const now = new Date();
+    const datetime = now.toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true });
+    const tradeType = document.getElementById("tradeType").value || null;
+    const checklist = getChecklist();
+    const grade = Object.values(checklist).some(Boolean) ? calcGrade(checklist) : null;
+    const confidence = pendingConfidence || null;
+    const trade = { pair, result, rr, notes: pendingNote, image: pendingImage, datetime, checklist, grade, tradeType, confidence };
+    trades.push(trade);
+
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+
+    document.getElementById("pair").value = "";
+    document.getElementById("result").value = "";
+    document.getElementById("tradeType").value = "";
+    document.getElementById("rr").value = "";
+    document.getElementById("image").value = "";
+    document.getElementById("preview").style.display = "none";
+    document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
+    // Reset note panel fields
+    ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("nq-confidence").value = 5;
+    document.getElementById("conf-value-display").textContent = "—";
+    document.getElementById("conf-value-label").textContent  = "—";
+    document.getElementById("yn-yes").classList.remove("active");
+    document.getElementById("yn-no").classList.remove("active");
+    pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
+    pendingImage = null;
+    pendingNote  = "";
+    pendingConfidence = null;
+    pendingYN = null;
+    confTouched = false;
+    updateNoteTrigger();
+    checkIds.forEach(id => { document.getElementById(id).checked = false; });
+    const badge = document.getElementById("grade-live");
+    badge.textContent = "—";
+    badge.style.color = "#555";
   }
 
-  // 9. Win rate trend
-  if (trades.length >= 6) {
-    const mid = Math.floor(trades.length / 2);
-    const diff = Math.round((wr(trades.slice(mid)) - wr(trades.slice(0,mid))) * 100);
-    if (diff <= -15) insights.push({ message:`Win rate dropped <strong>${Math.abs(diff)}pp</strong> in recent trades. Something has changed — review.`, severity:"warning", category:"trend" });
-    else if (diff >= 15) insights.push({ message:`Win rate improved <strong>${diff}pp</strong> in recent trades. You're getting better — keep going.`, severity:"good", category:"trend" });
+  function editDatetime(index) {
+    const current = trades[index].datetime || "";
+    const input = prompt("Edit date/time:", current);
+    if (input === null) return;
+    trades[index].datetime = input.trim() || current;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+    openDetailPanel(index);
   }
 
-  // 10. Revenge trading
-  let rev2 = 0;
-  for (let i = 1; i < trades.length; i++) if (isLoss(trades[i-1]) && isLoss(trades[i]) && trades[i-1].pair === trades[i].pair) rev2++;
-  if (rev2 >= 2) insights.push({ message:`<strong>${rev2} back-to-back losses</strong> on the same instrument detected. Revenge trading pattern — walk away after a loss.`, severity:"warning", category:"behavior" });
+  function editConfidence(index) {
+    const current = trades[index].confidence || "";
+    const input = prompt("Confidence level (1–10):", current);
+    if (input === null) return;
+    const num = parseInt(input);
+    if (isNaN(num) || num < 1 || num > 10) { alert("Enter a number between 1 and 10."); return; }
+    trades[index].confidence = num;
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+  }
 
-  const order = { warning:0, good:1, info:2 };
-  insights.sort((a,b) => (order[a.severity]??3) - (order[b.severity]??3));
-  return insights;
-}
+  function deleteTrade(index) {
+    trades.splice(index, 1);
+    localStorage.setItem("trades", JSON.stringify(trades));
+    renderTrades();
+  }
 
-function renderInsights(insights) {
-  if (!Array.isArray(insights) || !insights.length)
-    return `<p style="color:#888;font-size:14px;">No insights yet — add more trades.</p>`;
-  const bc = { warning:"#e53935", good:"#4caf50", info:"#42a5f5" };
-  const ic = { warning:"⚠️", good:"✅", info:"ℹ️" };
-  const tb = { warning:"#4a1010", good:"#0d3b1e", info:"#0d2a4a" };
-  const tc = { warning:"#ef9a9a", good:"#a5d6a7", info:"#90caf9" };
-  const cards = insights.map(({message,severity,category}) => {
-    const s = ["warning","good","info"].includes(severity) ? severity : "info";
-    return `<div style="display:flex;align-items:flex-start;background:#1e1e1e;border-left:4px solid ${bc[s]};border-radius:6px;padding:11px 14px;margin-bottom:9px;font-family:'Segoe UI',sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4);">
-      <span style="font-size:18px;margin-right:11px;flex-shrink:0;line-height:1.4;">${ic[s]}</span>
-      <div style="flex:1;">
-        <span style="color:#e0e0e0;font-size:14px;line-height:1.6;">${message}</span>
-        <div style="margin-top:5px;"><span style="background:${tb[s]};color:${tc[s]};font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:2px 8px;border-radius:4px;">${category}</span></div>
-      </div>
-    </div>`;
+  function openLightbox(index) {
+    document.getElementById("lightbox-img").src = trades[index].image;
+    document.getElementById("lightbox").classList.add("open");
+  }
+
+  function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("open");
+    document.getElementById("lightbox-img").src = "";
+  }
+
+  // Close lightbox on background click
+  document.getElementById("lightbox").addEventListener("click", function (e) {
+    if (e.target === this) closeLightbox();
   });
-  return `<div style="max-width:680px;">${cards.join("")}</div>`;
-}
 
-// ════════════════════════════════════════════════════════════════
-//  FEATURE 5 — Deep Analytics (Enhancements)
-// ════════════════════════════════════════════════════════════════
-function analyzeTimeOfDay(trades) {
-  if (!Array.isArray(trades) || !trades.length) return [];
-  function getSession(h, m) {
-    const t = h*60+m;
-    if (t < 570) return "Pre-Market (< 9:30)";
-    if (t < 660) return "NY Open (9:30–11:00)";
-    if (t < 840) return "Midday (11:00–14:00)";
-    if (t < 960) return "NY Afternoon (14:00–16:00)";
-    return "Other";
-  }
-  function parseHM(dt) {
-    if (!dt || typeof dt !== "string") return null;
-    const m = dt.match(/(\d{1,2}):(\d{2})/);
-    return m ? { h: parseInt(m[1],10), m: parseInt(m[2],10) } : null;
-  }
-  const b = {};
-  for (const t of trades) {
-    const p = parseHM(t.datetime); if (!p) continue;
-    const s = getSession(p.h, p.m);
-    if (!b[s]) b[s] = {wins:0,losses:0,total:0};
-    b[s].total++; if (t.result==="Win") b[s].wins++; if (t.result==="Loss") b[s].losses++;
-  }
-  return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([s,v])=>({session:s,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
-    .sort((a,b)=>b.winRate-a.winRate);
-}
+  renderTrades();
+  </script>
 
-function analyzeByGrade(trades) {
-  if (!Array.isArray(trades) || !trades.length) return [];
-  const b = {};
-  for (const t of trades) {
-    if (!t.grade) continue;
-    if (!b[t.grade]) b[t.grade]={wins:0,losses:0,total:0,cs:0,cc:0};
-    b[t.grade].total++; if (t.result==="Win") b[t.grade].wins++; if (t.result==="Loss") b[t.grade].losses++;
-    const c = parseFloat(t.confidence); if (!isNaN(c)&&c>=1&&c<=10) { b[t.grade].cs+=c; b[t.grade].cc++; }
-  }
-  return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([g,v])=>({grade:g,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100),avgConfidence:v.cc?Math.round(v.cs/v.cc*10)/10:null}))
-    .sort((a,b)=>b.winRate-a.winRate);
-}
 
-function analyzeByConfidence(trades) {
-  if (!Array.isArray(trades) || !trades.length) return [];
-  const BANDS = ["High (8–10)","Medium (6–7)","Low (4–5)","Very Low (1–3)"];
-  const getBand = c => c>=8?"High (8–10)":c>=6?"Medium (6–7)":c>=4?"Low (4–5)":c>=1?"Very Low (1–3)":null;
-  const b = {};
-  for (const t of trades) {
-    const c = parseFloat(t.confidence); if (isNaN(c)||c<1||c>10) continue;
-    const band = getBand(c); if (!band) continue;
-    if (!b[band]) b[band]={wins:0,losses:0,total:0};
-    b[band].total++; if (t.result==="Win") b[band].wins++; if (t.result==="Loss") b[band].losses++;
-  }
-  return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([band,v])=>({band,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
-    .sort((a,b)=>BANDS.indexOf(a.band)-BANDS.indexOf(b.band));
-}
-
-function findBestWorstSetups(trades) {
-  if (!Array.isArray(trades) || !trades.length) return {best:null,worst:null};
-  const b = {};
-  for (const t of trades) {
-    if (!t.pair||!t.tradeType) continue;
-    const k=`${t.pair} – ${t.tradeType}`;
-    if (!b[k]) b[k]={wins:0,losses:0,total:0};
-    b[k].total++; if (t.result==="Win") b[k].wins++; if (t.result==="Loss") b[k].losses++;
-  }
-  const q = Object.entries(b).filter(([,v])=>v.total>=3)
-    .map(([label,v])=>({label,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
-    .sort((a,b)=>b.winRate-a.winRate);
-  return q.length ? {best:q[0],worst:q[q.length-1]} : {best:null,worst:null};
-}
-
-function renderEnhancements(trades) {
-  if (!Array.isArray(trades) || !trades.length) return "";
-  const BG="#1e0d10",CB="#2a1218",BD="#4a1e28",TX="#f0d0d8",MT="#a07080",WC="#4caf80",LC="#e05050",BB="#3a1a20";
-  const barClr = wr => wr>=60?WC:wr>=40?"#f0c040":LC;
-
-  function card(title,body) {
-    return `<div style="background:${CB};border:1px solid ${BD};border-radius:10px;padding:16px 18px;margin-bottom:16px;">
-      <h3 style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:${TX};">${title}</h3>${body}</div>`;
-  }
-  function barRow(label,wins,losses,total,wr,extra) {
-    const c=barClr(wr), ex=extra?`<span style="color:${MT};font-size:11px;margin-left:7px;">${extra}</span>`:"";
-    return `<div style="margin-bottom:9px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-        <span style="color:${TX};font-size:12px;font-weight:500;">${label}</span>
-        <span style="color:${c};font-size:12px;font-weight:700;">${wr}% <span style="color:${MT};font-weight:400;font-size:11px;">${wins}W/${losses}L/${total}T</span>${ex}</span>
-      </div>
-      <div style="background:${BB};border-radius:3px;height:6px;overflow:hidden;"><div style="width:${wr}%;height:100%;background:${c};border-radius:3px;"></div></div>
-    </div>`;
-  }
-
-  let html = `<div style="background:${BG};padding:8px;font-family:'Segoe UI',Arial,sans-serif;">`;
-
-  const tod = analyzeTimeOfDay(trades);
-  if (tod.length) html += card("Session Performance", tod.map(s=>barRow(s.session,s.wins,s.losses,s.total,s.winRate)).join(""));
-
-  const gd = analyzeByGrade(trades);
-  if (gd.length) html += card("Performance by Grade", gd.map(g=>barRow(g.grade,g.wins,g.losses,g.total,g.winRate,g.avgConfidence?`Avg conf: ${g.avgConfidence}`:null)).join(""));
-
-  const cd = analyzeByConfidence(trades);
-  if (cd.length) {
-    const rows = cd.map(c=>{const cl=barClr(c.winRate);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;margin-bottom:5px;background:${BB};border-radius:6px;">
-      <span style="color:${TX};font-size:12px;font-weight:500;">${c.band}</span>
-      <div><span style="color:${cl};font-weight:700;font-size:13px;">${c.winRate}%</span><span style="color:${MT};font-size:11px;margin-left:5px;">${c.wins}W/${c.losses}L/${c.total}T</span></div>
-    </div>`;}).join("");
-    html += card("Win Rate by Confidence Level", rows);
-  }
-
-  const {best,worst} = findBestWorstSetups(trades);
-  if (best||worst) {
-    function pill(label,setup,ac) {
-      if (!setup) return "";
-      const rc=barClr(setup.winRate);
-      return `<div style="flex:1;background:${BB};border:1px solid ${BD};border-radius:8px;padding:12px 14px;min-width:150px;">
-        <div style="font-size:10px;text-transform:uppercase;color:${ac};letter-spacing:.6px;margin-bottom:5px;">${label}</div>
-        <div style="font-size:14px;font-weight:700;color:${TX};margin-bottom:5px;">${setup.label}</div>
-        <div style="font-size:20px;font-weight:800;color:${rc};">${setup.winRate}%</div>
-        <div style="font-size:11px;color:${MT};margin-top:3px;">${setup.wins}W/${setup.losses}L/${setup.total}T</div>
-      </div>`;
-    }
-    html += card("Best & Worst Setup Combinations",`<div style="display:flex;gap:10px;flex-wrap:wrap;">${pill("Best Setup",best,WC)}${pill("Worst Setup",worst,LC)}</div>`);
-  }
-
-  html += "</div>";
-  return html;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  INTEGRATION — inject sections + patch detail panel
-// ════════════════════════════════════════════════════════════════
-(function() {
-  const trades = JSON.parse(localStorage.getItem("trades")) || [];
-  if (trades.length < 3) return;
-
-  const content = document.getElementById("content");
-  if (!content) return;
-
-  // Build new analytics HTML
-  let html = "";
-
-  // Core metrics
-  html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Core Analytics</div>
-    <div style="max-width:900px;margin:0 auto;padding:0 16px 8px;">${renderCoreMetrics(trades)}</div>`;
-
-  // AI Insights
-  const ins = generateInsights(trades);
-  if (ins.length)
-    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">AI Insights</div>
-      <div style="max-width:700px;margin:0 auto;padding:0 16px;">${renderInsights(ins)}</div>`;
-
-  // Pattern Stats Engine
-  const pats = generatePatternStats(trades);
-  if (pats.length)
-    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Pattern Statistics Engine</div>
-      <div style="max-width:700px;margin:0 auto;padding:0 16px;">${renderPatternStats(pats)}</div>`;
-
-  // Deep Analytics
-  const enh = renderEnhancements(trades);
-  if (enh)
-    html += `<hr class="divider"><div class="section-title" style="margin-top:0;">Deep Analytics</div>
-      <div style="max-width:700px;margin:0 auto;padding:0 16px 8px;">${enh}</div>`;
-
-  // Insert before the last <hr class="divider"> (sits just before "Journals")
-  const dividers = content.querySelectorAll("hr.divider");
-  const anchor = dividers[dividers.length - 1];
-  if (anchor) anchor.insertAdjacentHTML("beforebegin", html);
-  else content.insertAdjacentHTML("beforeend", html);
-
-  // Patch openDetailPanel to prepend trade analysis card
-  const _orig = window.openDetailPanel;
-  if (typeof _orig === "function") {
-    window.openDetailPanel = function(index) {
-      _orig(index);
-      const t = (JSON.parse(localStorage.getItem("trades")) || [])[index];
-      if (!t) return;
-      const body = document.getElementById("detail-body");
-      if (body) body.insertAdjacentHTML("afterbegin", renderTradeAnalysis(t));
-    };
-  }
-})();
-</script>
-
-</body>
-</html>
+  </body>
+  </html>
