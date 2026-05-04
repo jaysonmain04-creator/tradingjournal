@@ -786,46 +786,84 @@
     </div>
     <div class="note-doc">
 
-      <div class="note-q">
-        <span class="note-q-label">Why did you enter this trade?</span>
-        <textarea id="nq-reason" rows="3" oninput="autoResize(this)"></textarea>
-      </div>
+      <!-- Trade questions (Win / Loss / BE) -->
+      <div id="trade-note-questions">
 
-      <div class="note-q">
-        <span class="note-q-label">Was the trade aligned with your analysis?</span>
-        <textarea id="nq-analysis" rows="2" oninput="autoResize(this)"></textarea>
-      </div>
-
-      <div class="note-q">
-        <span class="note-q-label">Were your rules followed?</span>
-        <textarea id="nq-rules" rows="2" oninput="autoResize(this)"></textarea>
-      </div>
-
-      <div class="note-q">
-        <span class="note-q-label">Was your mindset in the right place?</span>
-        <textarea id="nq-mindset" rows="2" oninput="autoResize(this)"></textarea>
-      </div>
-
-      <div class="note-q">
-        <span class="note-q-label">How did you feel coming into this trade?</span>
-        <textarea id="nq-feeling" rows="2" oninput="autoResize(this)"></textarea>
-      </div>
-
-      <div class="note-q">
-        <span class="note-q-label">Would you take it again if it presented itself?</span>
-        <div class="yn-row">
-          <button type="button" class="yn-btn yn-yes" id="yn-yes" onclick="setYN('yes')">Yes</button>
-          <button type="button" class="yn-btn yn-no"  id="yn-no"  onclick="setYN('no')">No</button>
+        <div class="note-q">
+          <span class="note-q-label">Why did you enter this trade?</span>
+          <textarea id="nq-reason" rows="3" oninput="autoResize(this)"></textarea>
         </div>
+
+        <div class="note-q">
+          <span class="note-q-label">Was the trade aligned with your analysis?</span>
+          <textarea id="nq-analysis" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">Were your rules followed?</span>
+          <textarea id="nq-rules" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">Was your mindset in the right place?</span>
+          <textarea id="nq-mindset" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">How did you feel coming into this trade?</span>
+          <textarea id="nq-feeling" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">Would you take it again if it presented itself?</span>
+          <div class="yn-row">
+            <button type="button" class="yn-btn yn-yes" id="yn-yes" onclick="setYN('yes')">Yes</button>
+            <button type="button" class="yn-btn yn-no"  id="yn-no"  onclick="setYN('no')">No</button>
+          </div>
+        </div>
+
+        <div class="note-q" style="margin-top:24px;">
+          <span class="note-q-label">How confident were you? &nbsp;<span id="conf-value-label" style="color:#8b3a44;font-size:13px;font-weight:bold;">—</span></span>
+          <div class="conf-row">
+            <input type="range" id="nq-confidence" min="1" max="10" value="5" oninput="updateConfLabel()">
+            <span class="conf-value" id="conf-value-display">—</span>
+          </div>
+          <div class="conf-labels"><span>1 – No conviction</span><span>10 – Full confidence</span></div>
+        </div>
+
       </div>
 
-      <div class="note-q" style="margin-top:24px;">
-        <span class="note-q-label">How confident were you? &nbsp;<span id="conf-value-label" style="color:#8b3a44;font-size:13px;font-weight:bold;">—</span></span>
-        <div class="conf-row">
-          <input type="range" id="nq-confidence" min="1" max="10" value="5" oninput="updateConfLabel()">
-          <span class="conf-value" id="conf-value-display">—</span>
+      <!-- No Trade reflection questions -->
+      <div id="no-trade-note-questions" style="display:none;">
+
+        <div class="note-q">
+          <span class="note-q-label">Why didn't you take a trade?</span>
+          <textarea id="nq-nt-why" rows="3" oninput="autoResize(this)"></textarea>
         </div>
-        <div class="conf-labels"><span>1 – No conviction</span><span>10 – Full confidence</span></div>
+
+        <div class="note-q">
+          <span class="note-q-label">What did price do today?</span>
+          <textarea id="nq-nt-price" rows="3" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">Did you skip a valid setup?</span>
+          <div class="yn-row">
+            <button type="button" class="yn-btn yn-yes" id="nq-nt-skip-yes" onclick="setNTSkip('yes')">Yes</button>
+            <button type="button" class="yn-btn yn-no"  id="nq-nt-skip-no"  onclick="setNTSkip('no')">No</button>
+          </div>
+        </div>
+
+        <div class="note-q" id="nq-nt-skip-reason-row" style="display:none;">
+          <span class="note-q-label">Why did you skip it?</span>
+          <textarea id="nq-nt-skip-reason" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
+        <div class="note-q">
+          <span class="note-q-label">How disciplined were you?</span>
+          <textarea id="nq-nt-discipline" rows="2" oninput="autoResize(this)"></textarea>
+        </div>
+
       </div>
 
     </div>
@@ -910,24 +948,40 @@
   }
 
   function closeNotePanel() {
-    pendingNoteData.reason   = document.getElementById("nq-reason").value.trim();
-    pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
-    pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
-    pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
-    pendingNoteData.feeling  = document.getElementById("nq-feeling").value.trim();
+    const isNoTrade = document.getElementById("result").value === "No Trade";
 
-    // Build combined note string
-    const parts = [];
-    if (pendingNoteData.reason)   parts.push("Why I entered: "         + pendingNoteData.reason);
-    if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
-    if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
-    if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
-    if (pendingNoteData.feeling)  parts.push("Feeling: "               + pendingNoteData.feeling);
-    if (pendingYN)                parts.push("Would take again: "      + (pendingYN === "yes" ? "Yes" : "No"));
-    pendingNote = parts.join("\n");
+    if (isNoTrade) {
+      // Build No Trade note string
+      const ntWhy        = document.getElementById("nq-nt-why").value.trim();
+      const ntPrice      = document.getElementById("nq-nt-price").value.trim();
+      const ntSkipReason = document.getElementById("nq-nt-skip-reason").value.trim();
+      const ntDiscipline = document.getElementById("nq-nt-discipline").value.trim();
+      const parts = ["[No Trade Day]"];
+      if (ntWhy)        parts.push("Why no trade: "         + ntWhy);
+      if (ntPrice)      parts.push("Price action: "         + ntPrice);
+      if (pendingNTSkip) parts.push("Skipped valid setup: " + (pendingNTSkip === "yes" ? "Yes" + (ntSkipReason ? " → " + ntSkipReason : "") : "No"));
+      if (ntDiscipline) parts.push("Discipline: "           + ntDiscipline);
+      pendingNote = parts.join("\n");
+    } else {
+      pendingNoteData.reason   = document.getElementById("nq-reason").value.trim();
+      pendingNoteData.analysis = document.getElementById("nq-analysis").value.trim();
+      pendingNoteData.rules    = document.getElementById("nq-rules").value.trim();
+      pendingNoteData.mindset  = document.getElementById("nq-mindset").value.trim();
+      pendingNoteData.feeling  = document.getElementById("nq-feeling").value.trim();
 
-    // Save confidence
-    if (confTouched) pendingConfidence = parseInt(document.getElementById("nq-confidence").value);
+      // Build combined note string
+      const parts = [];
+      if (pendingNoteData.reason)   parts.push("Why I entered: "         + pendingNoteData.reason);
+      if (pendingNoteData.analysis) parts.push("Aligned with analysis: " + pendingNoteData.analysis);
+      if (pendingNoteData.rules)    parts.push("Rules followed: "        + pendingNoteData.rules);
+      if (pendingNoteData.mindset)  parts.push("Mindset: "               + pendingNoteData.mindset);
+      if (pendingNoteData.feeling)  parts.push("Feeling: "               + pendingNoteData.feeling);
+      if (pendingYN)                parts.push("Would take again: "      + (pendingYN === "yes" ? "Yes" : "No"));
+      pendingNote = parts.join("\n");
+
+      // Save confidence
+      if (confTouched) pendingConfidence = parseInt(document.getElementById("nq-confidence").value);
+    }
 
     document.getElementById("note-panel").classList.remove("open");
     document.getElementById("note-overlay").classList.remove("open");
@@ -935,6 +989,15 @@
   }
 
   const pendingNoteData = { reason: "", analysis: "", rules: "", mindset: "", feeling: "" };
+  let pendingNTSkip = null; // "yes" | "no" | null — for No Trade skip toggle
+
+  function setNTSkip(val) {
+    pendingNTSkip = val;
+    document.getElementById("nq-nt-skip-yes").classList.toggle("active", val === "yes");
+    document.getElementById("nq-nt-skip-no").classList.toggle("active",  val === "no");
+    document.getElementById("nq-nt-skip-reason-row").style.display = val === "yes" ? "block" : "none";
+    if (val !== "yes") document.getElementById("nq-nt-skip-reason").value = "";
+  }
 
   function updateNoteTrigger() {
     const trigger  = document.getElementById("note-trigger");
@@ -1031,6 +1094,9 @@
     document.getElementById("rr").style.display                = isNoTrade ? "none" : "";
     document.getElementById("no-trade-section").style.display  = isNoTrade ? "block" : "none";
     document.getElementById("add-trade-btn").textContent       = isNoTrade ? "Log Day" : "Add Trade";
+    // Toggle note panel question sets
+    document.getElementById("trade-note-questions").style.display    = isNoTrade ? "none" : "block";
+    document.getElementById("no-trade-note-questions").style.display = isNoTrade ? "block" : "none";
     if (isNoTrade) {
       document.getElementById("tradeType").value = "";
       document.getElementById("rr").value = "";
@@ -1041,6 +1107,15 @@
       document.getElementById("nt-skip-reason-row").style.display = "none";
       document.getElementById("nt-skip-reason").value = "";
       document.getElementById("nt-discipline").value = "";
+      // Reset No Trade note panel fields
+      document.getElementById("nq-nt-why").value = "";
+      document.getElementById("nq-nt-price").value = "";
+      document.getElementById("nq-nt-skip-reason").value = "";
+      document.getElementById("nq-nt-discipline").value = "";
+      document.getElementById("nq-nt-skip-reason-row").style.display = "none";
+      document.getElementById("nq-nt-skip-yes").classList.remove("active");
+      document.getElementById("nq-nt-skip-no").classList.remove("active");
+      pendingNTSkip = null;
     }
   });
 
