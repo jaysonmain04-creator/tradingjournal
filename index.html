@@ -677,7 +677,6 @@
           <option value="">Select Pair</option>
           <option value="NQ">NQ</option>
           <option value="ES">ES</option>
-          <option value="MNQ">MNQ</option>
         </select>
 
         <select id="result">
@@ -1393,6 +1392,10 @@
   });
 
   renderTrades();
+
+  document.getElementById("result").addEventListener("change", function () {
+    console.log("Selected result:", this.value);
+  });
   </script>
 
 
