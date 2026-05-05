@@ -629,33 +629,6 @@
       }
       nav a:hover { opacity: 1 !important; text-decoration: underline; }
 
-      /* No Trade section */
-      #no-trade-section select,
-      #no-trade-section textarea {
-        width: 100%;
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 5px;
-        border: none;
-        background: #2b0f14;
-        color: white;
-        font-size: 14px;
-        box-sizing: border-box;
-        font-family: Arial;
-        appearance: none;
-        -webkit-appearance: none;
-      }
-      #no-trade-section select {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaa'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 10px center;
-        padding-right: 28px;
-      }
-      #no-trade-section textarea {
-        resize: vertical;
-        min-height: 72px;
-        line-height: 1.5;
-      }
       .trade.notrade-trade { border-left: 3px solid #888; }
 
     </style>
@@ -694,43 +667,6 @@
         </select>
 
         <input id="rr" placeholder="RR (e.g. 1:2)">
-
-        <!-- No Trade section — shown only when "No Trade" is selected -->
-        <div id="no-trade-section" style="display:none;">
-          <select id="nt-reason">
-            <option value="">Why no trade?</option>
-            <option>No setup formed</option>
-            <option>Choppy market</option>
-            <option>News / high impact</option>
-            <option>Missed entry</option>
-            <option>Mental state off</option>
-            <option>Broke rules → stopped</option>
-            <option>Other</option>
-          </select>
-          <textarea id="nt-price-action" placeholder="What did price do today?" rows="3" oninput="autoResize(this)"></textarea>
-          <select id="nt-skipped" onchange="toggleSkipReason(this.value)">
-            <option value="">Skipped valid setup?</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-          <div id="nt-skip-reason-row" style="display:none;">
-            <select id="nt-skip-reason">
-              <option value="">Why did you skip?</option>
-              <option>Hesitation</option>
-              <option>Fear</option>
-              <option>Didn't trust model</option>
-              <option>Late entry</option>
-            </select>
-          </div>
-          <select id="nt-discipline">
-            <option value="">Discipline grade (A–F)</option>
-            <option>A</option>
-            <option>B</option>
-            <option>C</option>
-            <option>D</option>
-            <option>F</option>
-          </select>
-        </div>
 
         <button type="button" class="note-trigger" id="note-trigger" onclick="openNotePanel()">
           <span class="note-trigger-icon">+</span>
@@ -1083,17 +1019,11 @@
   });
 
   // ── No Trade mode ──
-  function toggleSkipReason(val) {
-    document.getElementById("nt-skip-reason-row").style.display = val === "Yes" ? "block" : "none";
-    if (val !== "Yes") document.getElementById("nt-skip-reason").value = "";
-  }
-
   document.getElementById("result").addEventListener("change", function () {
     const isNoTrade = this.value === "No Trade";
-    document.getElementById("tradeType").style.display         = isNoTrade ? "none" : "";
-    document.getElementById("rr").style.display                = isNoTrade ? "none" : "";
-    document.getElementById("no-trade-section").style.display  = isNoTrade ? "block" : "none";
-    document.getElementById("add-trade-btn").textContent       = isNoTrade ? "Log Day" : "Add Trade";
+    document.getElementById("tradeType").style.display = isNoTrade ? "none" : "";
+    document.getElementById("rr").style.display        = isNoTrade ? "none" : "";
+    document.getElementById("add-trade-btn").textContent = isNoTrade ? "Log Day" : "Add Trade";
     // Toggle note panel question sets
     document.getElementById("trade-note-questions").style.display    = isNoTrade ? "none" : "block";
     document.getElementById("no-trade-note-questions").style.display = isNoTrade ? "block" : "none";
@@ -1101,13 +1031,7 @@
       document.getElementById("tradeType").value = "";
       document.getElementById("rr").value = "";
     } else {
-      document.getElementById("nt-reason").value = "";
-      document.getElementById("nt-price-action").value = "";
-      document.getElementById("nt-skipped").value = "";
-      document.getElementById("nt-skip-reason-row").style.display = "none";
-      document.getElementById("nt-skip-reason").value = "";
-      document.getElementById("nt-discipline").value = "";
-      // Reset No Trade note panel fields
+      // Reset No Trade note panel fields when switching away
       document.getElementById("nq-nt-why").value = "";
       document.getElementById("nq-nt-price").value = "";
       document.getElementById("nq-nt-skip-reason").value = "";
@@ -1361,18 +1285,12 @@
     let notes, checklist, grade, tradeType, confidence, rr;
 
     if (isNoTrade) {
-      const ntReason   = document.getElementById("nt-reason").value;
-      const ntPriceAct = document.getElementById("nt-price-action").value.trim();
-      const ntSkipped  = document.getElementById("nt-skipped").value;
-      const ntSkipWhy  = document.getElementById("nt-skip-reason").value;
-      const ntDisc     = document.getElementById("nt-discipline").value;
-      const parts = ["[No Trade Day]"];
-      if (ntReason)   parts.push("Reason: "              + ntReason);
-      if (ntPriceAct) parts.push("Price action: "        + ntPriceAct);
-      if (ntSkipped)  parts.push("Skipped valid setup: " + ntSkipped + (ntSkipped === "Yes" && ntSkipWhy ? " → " + ntSkipWhy : ""));
-      if (ntDisc)     parts.push("Discipline: "          + ntDisc);
-      notes = parts.join("\n");
-      rr = ""; checklist = null; grade = null; tradeType = null; confidence = null;
+      rr        = "";
+      tradeType = null;
+      checklist = getChecklist();
+      grade     = Object.values(checklist).some(Boolean) ? calcGrade(checklist) : null;
+      confidence = null;
+      notes     = pendingNote;
     } else {
       rr        = document.getElementById("rr").value;
       tradeType = document.getElementById("tradeType").value || null;
@@ -1396,20 +1314,18 @@
     document.getElementById("preview").style.display = "none";
     document.getElementById("file-label-text").textContent = "📎 Attach screenshot (optional)";
 
-    // Reset no-trade fields + restore visibility
-    document.getElementById("nt-reason").value       = "";
-    document.getElementById("nt-price-action").value = "";
-    document.getElementById("nt-skipped").value      = "";
-    document.getElementById("nt-skip-reason").value  = "";
-    document.getElementById("nt-skip-reason-row").style.display = "none";
-    document.getElementById("nt-discipline").value   = "";
-    document.getElementById("no-trade-section").style.display = "none";
+    // Restore visibility
     document.getElementById("tradeType").style.display = "";
     document.getElementById("rr").style.display        = "";
     document.getElementById("add-trade-btn").textContent = "Add Trade";
 
     // Reset note panel fields
     ["nq-reason","nq-analysis","nq-rules","nq-mindset","nq-feeling"].forEach(id => { document.getElementById(id).value = ""; });
+    ["nq-nt-why","nq-nt-price","nq-nt-skip-reason","nq-nt-discipline"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("nq-nt-skip-reason-row").style.display = "none";
+    document.getElementById("nq-nt-skip-yes").classList.remove("active");
+    document.getElementById("nq-nt-skip-no").classList.remove("active");
+    pendingNTSkip = null;
     document.getElementById("nq-confidence").value = 5;
     document.getElementById("conf-value-display").textContent = "—";
     document.getElementById("conf-value-label").textContent   = "—";
@@ -1417,6 +1333,8 @@
     document.getElementById("yn-no").classList.remove("active");
     pendingNoteData.reason = pendingNoteData.analysis = pendingNoteData.rules = pendingNoteData.mindset = pendingNoteData.feeling = "";
     pendingImage = null; pendingNote = ""; pendingConfidence = null; pendingYN = null; confTouched = false;
+    document.getElementById("trade-note-questions").style.display    = "block";
+    document.getElementById("no-trade-note-questions").style.display = "none";
     updateNoteTrigger();
     checkIds.forEach(id => { document.getElementById(id).checked = false; });
     const badge = document.getElementById("grade-live");
