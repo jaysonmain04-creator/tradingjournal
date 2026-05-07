@@ -468,7 +468,7 @@ try {
   const losses = trades.filter(t => t.result === "Loss");
   const bes    = trades.filter(t => t.result === "BE");
   const total  = trades.length;
-  const winRate = ((wins.length / total) * 100).toFixed(0);
+  const winRate = (wins.length + losses.length) > 0 ? ((wins.length / (wins.length + losses.length)) * 100).toFixed(0) : "0";
 
   // ── RR parsing ──
   function parseRR(rr) {
@@ -506,8 +506,8 @@ try {
       target: "Clear DOL", pd: "Correct P/D", momentum: "No Chop"
     };
 
-    function wr(set)  { return Math.round(set.filter(t => t.result === "Win").length  / set.length * 100); }
-    function lr(set)  { return Math.round(set.filter(t => t.result === "Loss").length / set.length * 100); }
+    function wr(set)  { const w=set.filter(t=>t.result==="Win").length, l=set.filter(t=>t.result==="Loss").length; return (w+l)>0?Math.round(w/(w+l)*100):0; }
+    function lr(set)  { const w=set.filter(t=>t.result==="Win").length, l=set.filter(t=>t.result==="Loss").length; return (w+l)>0?Math.round(l/(w+l)*100):0; }
 
     // Build a pattern record. Returns null if set is below MIN trades.
     function detect(label, set, vsSet) {
@@ -517,7 +517,7 @@ try {
       const winRate  = wr(set);
       const lossRate = lr(set);
       const vsWR = (vsSet && vsSet.length >= 2)
-        ? Math.round(vsSet.filter(t => t.result === "Win").length / vsSet.length * 100)
+        ? (()=>{ const vw=vsSet.filter(t=>t.result==="Win").length, vl=vsSet.filter(t=>t.result==="Loss").length; return (vw+vl)>0?Math.round(vw/(vw+vl)*100):0; })()
         : null;
       const type = winRate >= 65 ? "good" : lossRate >= 60 ? "warning" : "info";
       return { label, count: set.length, wins, losses, wr: winRate, lr: lossRate, vsWR, type };
@@ -1752,7 +1752,7 @@ function generatePatternStats(trades) {
     const losses = subset.filter(t => t.result === "Loss").length;
     const bes    = subset.filter(t => t.result === "BE").length;
     return { label, total: subset.length, wins, losses, bes,
-             winRate: Math.round((wins / subset.length) * 100), category };
+             winRate: (wins+losses)>0?Math.round((wins/(wins+losses))*100):0, category };
   }
 
   function confBucket(c) {
@@ -2062,7 +2062,7 @@ function analyzeTimeOfDay(trades) {
     b[s].total++; if (t.result==="Win") b[s].wins++; if (t.result==="Loss") b[s].losses++;
   }
   return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([s,v])=>({session:s,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .map(([s,v])=>({session:s,total:v.total,wins:v.wins,losses:v.losses,winRate:(v.wins+v.losses)>0?Math.round(v.wins/(v.wins+v.losses)*100):0}))
     .sort((a,b)=>b.winRate-a.winRate);
 }
 
@@ -2076,7 +2076,7 @@ function analyzeByGrade(trades) {
     const c = parseFloat(t.confidence); if (!isNaN(c)&&c>=1&&c<=10) { b[t.grade].cs+=c; b[t.grade].cc++; }
   }
   return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([g,v])=>({grade:g,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100),avgConfidence:v.cc?Math.round(v.cs/v.cc*10)/10:null}))
+    .map(([g,v])=>({grade:g,total:v.total,wins:v.wins,losses:v.losses,winRate:(v.wins+v.losses)>0?Math.round(v.wins/(v.wins+v.losses)*100):0,avgConfidence:v.cc?Math.round(v.cs/v.cc*10)/10:null}))
     .sort((a,b)=>b.winRate-a.winRate);
 }
 
@@ -2092,7 +2092,7 @@ function analyzeByConfidence(trades) {
     b[band].total++; if (t.result==="Win") b[band].wins++; if (t.result==="Loss") b[band].losses++;
   }
   return Object.entries(b).filter(([,v])=>v.total>=2)
-    .map(([band,v])=>({band,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .map(([band,v])=>({band,total:v.total,wins:v.wins,losses:v.losses,winRate:(v.wins+v.losses)>0?Math.round(v.wins/(v.wins+v.losses)*100):0}))
     .sort((a,b)=>BANDS.indexOf(a.band)-BANDS.indexOf(b.band));
 }
 
@@ -2106,7 +2106,7 @@ function findBestWorstSetups(trades) {
     b[k].total++; if (t.result==="Win") b[k].wins++; if (t.result==="Loss") b[k].losses++;
   }
   const q = Object.entries(b).filter(([,v])=>v.total>=3)
-    .map(([label,v])=>({label,total:v.total,wins:v.wins,losses:v.losses,winRate:Math.round(v.wins/v.total*100)}))
+    .map(([label,v])=>({label,total:v.total,wins:v.wins,losses:v.losses,winRate:(v.wins+v.losses)>0?Math.round(v.wins/(v.wins+v.losses)*100):0}))
     .sort((a,b)=>b.winRate-a.winRate);
   return q.length ? {best:q[0],worst:q[q.length-1]} : {best:null,worst:null};
 }
