@@ -232,10 +232,10 @@
 <body>
 
 <nav>
-  <a href="index.html" style="opacity:0.4;">Journal</a>
-  <a href="analysis.html" style="opacity:0.4;">Analysis</a>
-  <a href="calendar.html">Calendar</a>
-  <a href="replay.html" style="opacity:0.4;">Replay</a>
+  <a href="index.html">Journal</a>
+  <a href="analysis.html">Analysis</a>
+  <a href="calendar.html" style="text-decoration:underline;">Calendar</a>
+  <a href="replay.html">Replay</a>
 </nav>
 
 <h1>Trading Calendar</h1>
