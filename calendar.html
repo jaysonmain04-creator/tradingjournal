@@ -436,7 +436,9 @@ function hasViolation(dayTrades) {
 function renderAnalytics() {
   const real     = allTrades.filter(t => t.result && t.result !== "No Trade");
   const wins     = real.filter(t => t.result === "Win");
-  const winRate  = real.length ? Math.round((wins.length / real.length) * 100) : null;
+  const losses   = real.filter(t => t.result === "Loss");
+  const wlTotal  = wins.length + losses.length;
+  const winRate  = wlTotal ? Math.round((wins.length / wlTotal) * 100) : null;
 
   const confTs  = real.filter(t => t.confidence);
   const avgConf = confTs.length ? (confTs.reduce((s,t)=>s+t.confidence,0)/confTs.length).toFixed(1) : null;
@@ -490,7 +492,7 @@ function renderStreaks() {
     const loss = real.filter(t=>t.result==="Loss").length;
 
     if (real.length) {
-      if (wins>loss) { wC++; wM=Math.max(wM,wC); } else wC=0;
+      if (wins>loss) { wC++; wM=Math.max(wM,wC); } else if (loss>0) wC=0;
       const hasC = real.some(t=>t.grade==="C");
       if (!hasC) { rC++; rM=Math.max(rM,rC); } else rC=0;
       const confTs = real.filter(t=>t.confidence);
