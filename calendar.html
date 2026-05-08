@@ -118,9 +118,9 @@
     }
 
     /* ── Heatmap ── */
-    #heatmap-view { display: none; }
-    .heatmap-scroll { overflow-x: auto; padding-bottom: 8px; }
-    .hm-wrap { display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content; }
+    #heatmap-view { display: none; padding-top: 16px; min-height: 200px; }
+    .heatmap-scroll { overflow-x: auto; padding-bottom: 8px; min-height: 140px; }
+    .hm-wrap { display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content; min-height: 120px; }
     .hm-month-labels { display: flex; gap: 3px; padding-left: 28px; margin-bottom: 2px; }
     .hm-month-label-cell { width: 14px; font-size: 9px; color: #666; text-align: center; flex-shrink: 0; white-space: nowrap; overflow: visible; }
     .hm-body { display: flex; gap: 3px; }
@@ -629,14 +629,27 @@ function renderCalendar() {
 function renderHeatmap() {
   const wrap     = document.getElementById("hm-wrap");
   wrap.innerHTML = "";
+  wrap.style.opacity = "0";
+  wrap.style.transition = "opacity 0.4s ease";
 
-  // Last 52 weeks from today
+  const tradeDays = Object.keys(tradesByDay).sort();
+  const totalDays = tradeDays.length;
+
+  // Show placeholder if no data
+  if (totalDays === 0) {
+    wrap.style.opacity = "1";
+    wrap.innerHTML = `<div style="text-align:center;color:#555;padding:60px 20px;font-size:14px;">Log more trades to build your performance heatmap.</div>`;
+    return;
+  }
+
+  // Auto-zoom: fewer than 30 trade days → show only recent 12 weeks, else 52
+  const weeksToShow = totalDays < 30 ? 16 : 52;
+
   const end   = new Date();
   const start = new Date(end);
-  start.setDate(start.getDate() - 364);
-  start.setDate(start.getDate() - start.getDay()); // align to Sunday
+  start.setDate(start.getDate() - (weeksToShow * 7));
+  start.setDate(start.getDate() - start.getDay());
 
-  // Build week columns
   const weeks = [];
   let cur = new Date(start);
   while (cur <= end) {
@@ -651,9 +664,8 @@ function renderHeatmap() {
   // Month labels row
   const mlRow = document.createElement("div");
   mlRow.className = "hm-month-labels";
-  // spacer for day-label column
   const spacer = document.createElement("div");
-  spacer.style.cssText = "width:28px;flex-shrink:0;";
+  spacer.style.cssText = "width:32px;flex-shrink:0;";
   mlRow.appendChild(spacer);
 
   let lastMo = -1;
@@ -686,6 +698,7 @@ function renderHeatmap() {
   const weeksEl = document.createElement("div");
   weeksEl.className = "hm-weeks";
 
+  let populated = 0;
   weeks.forEach(week => {
     const weekEl = document.createElement("div");
     weekEl.className = "hm-week";
@@ -695,22 +708,25 @@ function renderHeatmap() {
       const dayTrades = tradesByDay[k] || [];
       const cell      = document.createElement("div");
       cell.className  = "hm-cell";
+      // subtle border so grid is always visible
+      cell.style.outline = "1px solid rgba(255,255,255,0.04)";
 
       if (dayTrades.length) {
+        populated++;
         cell.classList.add("clickable");
         const real   = dayTrades.filter(t=>t.result!=="No Trade");
         const wins   = real.filter(t=>t.result==="Win").length;
         const losses = real.filter(t=>t.result==="Loss").length;
         const nts    = dayTrades.filter(t=>t.result==="No Trade").length;
 
-        let bg = "#1a3a5a"; // default: BE/mixed
-        if (nts === dayTrades.length)       bg = "#2a2030";
-        else if (wins > losses*1.5)         bg = "#4caf50";
-        else if (wins > losses)             bg = "#2d7a32";
-        else if (wins>0 && losses===0)      bg = "#1b4a1e";
-        else if (losses > wins*1.5)         bg = "#e53935";
-        else if (losses > wins)             bg = "#7a2020";
-        else if (losses>0 && wins===0)      bg = "#4a1818";
+        let bg = "#1a3a5a";
+        if (nts === dayTrades.length)  bg = "#2a2030";
+        else if (wins > losses*1.5)    bg = "#4caf50";
+        else if (wins > losses)        bg = "#2d7a32";
+        else if (wins>0&&losses===0)   bg = "#1b4a1e";
+        else if (losses > wins*1.5)    bg = "#e53935";
+        else if (losses > wins)        bg = "#7a2020";
+        else if (losses>0&&wins===0)   bg = "#4a1818";
 
         cell.style.background = bg;
         cell.title = MONTHS_SHORT[date.getMonth()]+" "+date.getDate()+" — "+wins+"W "+losses+"L"+(nts?" "+nts+"NT":"");
@@ -727,6 +743,17 @@ function renderHeatmap() {
 
   body.appendChild(weeksEl);
   wrap.appendChild(body);
+
+  // Low-data hint
+  if (totalDays < 30) {
+    const hint = document.createElement("div");
+    hint.style.cssText = "font-size:11px;color:#555;margin-top:10px;text-align:center;";
+    hint.textContent = `Showing last ${weeksToShow} weeks · ${totalDays} day${totalDays===1?"":"s"} logged · Log more trades to expand the heatmap`;
+    wrap.appendChild(hint);
+  }
+
+  // Fade in
+  requestAnimationFrame(() => { wrap.style.opacity = "1"; });
 }
 
 // ── View toggle ──
